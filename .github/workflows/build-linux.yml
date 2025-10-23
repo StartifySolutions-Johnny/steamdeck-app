@@ -16,10 +16,17 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
+            - name: List workspace (debug)
+              run: |
+                  set -eux
+                  echo "PWD: $(pwd)"
+                  echo "== root ls =="; ls -la || true
+                  echo "== steamdeck-app ls =="; ls -la steamdeck-app || true
+
             - name: Setup Node
               uses: actions/setup-node@v4
               with:
-                  node-version: "18"
+                  node-version: "22"
 
             - name: Runner diagnostics (helpful when debugging apt issues)
               run: |
