@@ -157,7 +157,6 @@ async function runUpdater(options) {
         emitProgress(Math.min(PHASE.CREATE_MAX, createPct), `Prepared folder for ${relPath}`)
         console.log(`[updater] Prepared folder for ${relPath}`)
         // brief pause so user can follow folder creation
-        await sleep(500)
     }
 
     // Phase 3: download each file individually (report progress 15-100%)
@@ -181,7 +180,6 @@ async function runUpdater(options) {
             emitProgress(Math.min(100, overallAfter), `Downloaded ${relPath}`)
             console.log(`[updater] Downloaded ${relPath}`)
             // brief pause so you can follow progress
-            await sleep(500)
         } catch (e) {
             try { fs.rmSync(tmpRoot, { recursive: true, force: true }) } catch (e) { }
             throw new Error('Failed to download ' + f.url + ': ' + e.message)
