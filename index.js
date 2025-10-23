@@ -47,6 +47,9 @@ async function createWindow() {
 
     // Choose the first path that exists, preferring unpacked/external resources when packaged
     const chosenDistIndex = fs.existsSync(unpackedDistIndex) ? unpackedDistIndex : (fs.existsSync(extraResourcesDistIndex) ? extraResourcesDistIndex : (fs.existsSync(embeddedDistIndex) ? embeddedDistIndex : (fs.existsSync(siblingDistIndex) ? siblingDistIndex : null)))
+    // resolvedDistDir will hold the final, writable dist directory the app should serve from.
+    // It's computed below (may be copied to userData on AppImage) and then reused by the server.
+    let resolvedDistDir = null
 
     // Run the updater to download remote content and books when available.
     let progressWin = null
@@ -100,6 +103,8 @@ async function createWindow() {
                 console.warn('[updater] failed to copy runtime dist to userData, falling back to runtime source dir:', e && e.message)
                 distDir = runtimeSourceDir
             }
+            // record resolved dir for use by the server below
+            resolvedDistDir = distDir
         }
 
         // create a small progress window
@@ -153,7 +158,8 @@ async function createWindow() {
         const http = require('http')
         const url = require('url')
 
-        const distDir = path.dirname(chosenDistIndex)
+        // Use the resolved writable dist if available; otherwise fall back to chosenDistIndex
+        const distDir = resolvedDistDir || path.dirname(chosenDistIndex || embeddedDistIndex)
 
         const server = http.createServer((req, res) => {
             try {
