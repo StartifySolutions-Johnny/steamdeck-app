@@ -53,7 +53,54 @@ async function createWindow() {
     try {
         const { ipcMain } = require('electron')
         const updater = require(path.join(__dirname, 'updater'))
-        const distDir = path.dirname(chosenDistIndex || embeddedDistIndex)
+
+        // Determine the runtime dist directory (where the app currently serves from).
+        // This may be inside the mounted AppImage (read-only). If so, copy it to
+        // a writable location under app.getPath('userData') and use that for updates.
+        const runtimeSourceDir = path.dirname(chosenDistIndex || embeddedDistIndex)
+        let distDir = runtimeSourceDir
+
+        // Detect AppImage / mounted runtime on Linux
+        const runningOnLinux = process.platform === 'linux'
+        const runningAsAppImage = !!process.env.APPIMAGE || (process.resourcesPath && process.resourcesPath.includes('/.mount'))
+        if (runningOnLinux && runningAsAppImage) {
+            try {
+                const userDist = path.join(app.getPath('userData'), 'dist')
+                // If userDist doesn't exist, copy the runtimeSourceDir contents into it
+                if (runtimeSourceDir && fs.existsSync(runtimeSourceDir) && !fs.existsSync(userDist)) {
+                    console.log('[updater] packaging: copying runtime dist to userData:', runtimeSourceDir, '->', userDist)
+                    // ensure parent exists
+                    fs.mkdirSync(userDist, { recursive: true })
+                    // Use fs.cpSync when available (Node 16+). Fallback to manual copy.
+                    if (typeof fs.cpSync === 'function') {
+                        fs.cpSync(runtimeSourceDir, userDist, { recursive: true })
+                    } else {
+                        // simple recursive copy
+                        const copyRecursiveSync = (src, dest) => {
+                            const entries = fs.readdirSync(src, { withFileTypes: true })
+                            for (const entry of entries) {
+                                const srcPath = path.join(src, entry.name)
+                                const destPath = path.join(dest, entry.name)
+                                if (entry.isDirectory()) {
+                                    if (!fs.existsSync(destPath)) fs.mkdirSync(destPath)
+                                    copyRecursiveSync(srcPath, destPath)
+                                } else {
+                                    fs.copyFileSync(srcPath, destPath)
+                                }
+                            }
+                        }
+                        copyRecursiveSync(runtimeSourceDir, userDist)
+                    }
+                    distDir = userDist
+                } else if (fs.existsSync(userDist)) {
+                    // already present, prefer it
+                    distDir = userDist
+                }
+            } catch (e) {
+                console.warn('[updater] failed to copy runtime dist to userData, falling back to runtime source dir:', e && e.message)
+                distDir = runtimeSourceDir
+            }
+        }
 
         // create a small progress window
         progressWin = new BrowserWindow({
