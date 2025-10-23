@@ -34,13 +34,19 @@ async function createWindow() {
         }
     })
 
-    // Prefer an embedded dist folder inside this Electron app first
+    // Resolve possible dist locations. When packaged, electron-builder may
+    // place unpacked resources under process.resourcesPath (app.asar.unpacked)
+    const resourcesPath = process.resourcesPath || __dirname
+    const unpackedDistIndex = path.join(resourcesPath, 'app.asar.unpacked', 'dist', 'index.html')
+    const extraResourcesDistIndex = path.join(resourcesPath, 'app-dist', 'index.html')
+    // Prefer an embedded dist folder inside this Electron app first (dev)
     const embeddedDistIndex = path.join(__dirname, 'dist', 'index.html')
     // Fallback to the sibling project build
     const siblingDistIndex = path.join(__dirname, '..', 'nintendo-switch-web-ui', 'dist', 'index.html')
     const localIndex = path.join(__dirname, 'index.html')
 
-    const chosenDistIndex = fs.existsSync(embeddedDistIndex) ? embeddedDistIndex : (fs.existsSync(siblingDistIndex) ? siblingDistIndex : null)
+    // Choose the first path that exists, preferring unpacked/external resources when packaged
+    const chosenDistIndex = fs.existsSync(unpackedDistIndex) ? unpackedDistIndex : (fs.existsSync(extraResourcesDistIndex) ? extraResourcesDistIndex : (fs.existsSync(embeddedDistIndex) ? embeddedDistIndex : (fs.existsSync(siblingDistIndex) ? siblingDistIndex : null)))
 
     // Run the updater to download remote content and books when available.
     let progressWin = null
