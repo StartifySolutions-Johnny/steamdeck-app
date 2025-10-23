@@ -1,0 +1,46 @@
+name: Build Linux AppImage (steamdeck-app only)
+
+on:
+    push:
+        branches:
+            - production
+
+permissions:
+    contents: write
+
+jobs:
+    build-steamdeck:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "18"
+
+            - name: Install system deps (for electron-builder)
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libgtk-3-0 libnotify4 libgconf-2-4 libnss3 libxss1 libasound2
+
+            - name: Install deps for steamdeck-app
+              working-directory: ./steamdeck-app
+              run: |
+                  npm ci
+
+            - name: Build AppImage (steamdeck-app)
+              working-directory: ./steamdeck-app
+              run: |
+                  npm run build:linux
+
+            - name: Publish release with AppImage
+              uses: softprops/action-gh-release@v1
+              with:
+                  tag_name: steamdeck-app-appimage-${{ github.run_number }}
+                  name: Steamdeck App AppImage ${{ github.run_number }}
+                  files: steamdeck-app/release/*.AppImage
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
