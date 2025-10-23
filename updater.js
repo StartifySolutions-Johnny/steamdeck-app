@@ -1,11 +1,13 @@
 const fs = require('fs')
 const path = require('path')
 const http = require('http')
+const https = require('https')
 const { URL } = require('url')
 
 function fetchText(url, timeout = 10000) {
     return new Promise((resolve, reject) => {
-        const req = http.get(url, (res) => {
+        const client = url.startsWith('https://') ? https : http
+        const req = client.get(url, (res) => {
             if (res.statusCode && res.statusCode >= 400) return reject(new Error('HTTP ' + res.statusCode))
             let data = ''
             res.setEncoding('utf8')
@@ -20,7 +22,8 @@ function fetchText(url, timeout = 10000) {
 function downloadToFile(url, destPath, timeout = 20000, onProgress) {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(destPath)
-        const req = http.get(url, (res) => {
+        const client = url.startsWith('https://') ? https : http
+        const req = client.get(url, (res) => {
             if (res.statusCode && res.statusCode >= 400) return reject(new Error('HTTP ' + res.statusCode))
             const total = parseInt(res.headers['content-length'] || '0', 10)
             let received = 0

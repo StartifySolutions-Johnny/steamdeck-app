@@ -78,7 +78,7 @@ async function createWindow() {
         try {
             // notify UI we're starting
             onStatus('Starting update...')
-            const res = await updater.runUpdater({ distDir, remoteBaseUrl: 'http://localhost:5173', onProgress })
+            const res = await updater.runUpdater({ distDir, remoteBaseUrl: 'https://nintendo-switch-ui-9e01d8018d0a.herokuapp.com', onProgress })
             if (res && res.updated) console.log('Updater applied: ', res)
             else console.log('Updater: no update required', res)
             onStatus('Update complete')
