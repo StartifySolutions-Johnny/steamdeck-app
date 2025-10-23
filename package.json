@@ -31,6 +31,10 @@
       "updater-ui.html",
       "package.json"
     ],
+    "asarUnpack": [
+      "dist/**",
+      "public/**"
+    ],
     "win": {
       "target": [
         {
