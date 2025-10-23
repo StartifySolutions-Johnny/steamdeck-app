@@ -52,12 +52,12 @@ jobs:
                     libappindicator3-1 || true
 
             - name: Install deps for steamdeck-app
-              working-directory: ./steamdeck-app
+              working-directory: steamdeck-app
               run: |
-                  npm install
+                  npm ci
 
             - name: Build AppImage (steamdeck-app)
-              working-directory: ./steamdeck-app
+              working-directory: steamdeck-app
               run: |
                   npm run build:linux
 
