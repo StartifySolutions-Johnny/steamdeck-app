@@ -54,7 +54,7 @@ jobs:
             - name: Install deps for steamdeck-app
               working-directory: ./steamdeck-app
               run: |
-                  npm ci
+                  npm install
 
             - name: Build AppImage (steamdeck-app)
               working-directory: ./steamdeck-app
