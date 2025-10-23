@@ -68,11 +68,17 @@ jobs:
               run: |
                   npm run build:linux
 
+            - name: Locate AppImage artifacts (debug)
+              run: |
+                  set -eux
+                  echo "== find AppImage files =="; find . -type f -name "*.AppImage" -maxdepth 5 || true
+                  echo "== ls release dirs =="; ls -la **/release || true
+
             - name: Publish release with AppImage
               uses: softprops/action-gh-release@v1
               with:
                   tag_name: steamdeck-app-appimage-${{ github.run_number }}
                   name: Steamdeck App AppImage ${{ github.run_number }}
-                  files: steamdeck-app/release/*.AppImage
+                  files: "**/release/*.AppImage"
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
