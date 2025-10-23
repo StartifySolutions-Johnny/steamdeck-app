@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src http: https:;">
+    <title>Updater</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            padding: 18px;
+        }
+
+        #bar {
+            width: 100%;
+            height: 18px;
+        }
+
+        #status {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #333
+        }
+    </style>
+</head>
+
+<body>
+    <h3>Updating content...</h3>
+    <progress id="bar" value="0" max="100"></progress>
+    <div id="status">Preparing...</div>
+
+    <script>
+        const bar = document.getElementById('bar')
+        const status = document.getElementById('status')
+        if (window.updater) {
+            window.updater.onProgress((p) => {
+                if (typeof p.percent === 'number') bar.value = Math.round(p.percent)
+                if (p.message) status.textContent = p.message
+            })
+            window.updater.onStatus((s) => { status.textContent = s })
+        }
+    </script>
+</body>
+
+</html>

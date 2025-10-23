@@ -1,0 +1,24 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.startifysolutions.gamepad
+productName: Gamepad App
+files:
+  - filter:
+      - dist/**/*
+      - index.js
+      - package.json
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+linux:
+  target:
+    - AppImage
+  category: Utility
+electronVersion: 38.3.0
