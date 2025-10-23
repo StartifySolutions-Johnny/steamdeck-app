@@ -26,6 +26,9 @@
     "files": [
       "dist/**/*",
       "index.js",
+      "preload-updater.js",
+      "updater.js",
+      "updater-ui.html",
       "package.json"
     ],
     "win": {
