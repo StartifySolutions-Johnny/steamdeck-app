@@ -42,11 +42,11 @@ async function createWindow() {
     // Prefer an embedded dist folder inside this Electron app first (dev)
     const embeddedDistIndex = path.join(__dirname, 'dist', 'index.html')
     // Fallback to the sibling project build
-    const siblingDistIndex = path.join(__dirname, '..', 'nintendo-switch-web-ui', 'dist', 'index.html')
+    //const siblingDistIndex = path.join(__dirname, '..', 'nintendo-switch-web-ui', 'dist', 'index.html')
     const localIndex = path.join(__dirname, 'index.html')
 
     // Choose the first path that exists, preferring unpacked/external resources when packaged
-    const chosenDistIndex = fs.existsSync(unpackedDistIndex) ? unpackedDistIndex : (fs.existsSync(extraResourcesDistIndex) ? extraResourcesDistIndex : (fs.existsSync(embeddedDistIndex) ? embeddedDistIndex : (fs.existsSync(siblingDistIndex) ? siblingDistIndex : null)))
+    const chosenDistIndex = fs.existsSync(unpackedDistIndex) ? unpackedDistIndex : (fs.existsSync(extraResourcesDistIndex) ? extraResourcesDistIndex : fs.existsSync(embeddedDistIndex) ? embeddedDistIndex : null)
     // resolvedDistDir will hold the final, writable dist directory the app should serve from.
     // It's computed below (may be copied to userData on AppImage) and then reused by the server.
     let resolvedDistDir = null
@@ -158,6 +158,14 @@ async function createWindow() {
         const http = require('http')
         const url = require('url')
 
+        // If a userData copy exists from a previous run, prefer it so updates persist
+        try {
+            const userDistCandidate = path.join(app.getPath('userData'), 'dist')
+            if (!resolvedDistDir && fs.existsSync(userDistCandidate)) resolvedDistDir = userDistCandidate
+        } catch (e) {
+            // ignore
+        }
+
         // Use the resolved writable dist if available; otherwise fall back to chosenDistIndex
         const distDir = resolvedDistDir || path.dirname(chosenDistIndex || embeddedDistIndex)
 
@@ -198,6 +206,32 @@ async function createWindow() {
                 }[ext] || 'application/octet-stream'
 
                 res.setHeader('Content-Type', mime)
+                // Prevent caching of JSON manifests so updated content.json is picked up immediately
+                if (ext === '.json') {
+                    res.setHeader('Cache-Control', 'no-store, must-revalidate')
+                    res.setHeader('Pragma', 'no-cache')
+                    res.setHeader('Expires', '0')
+                }
+                // Add ETag/Last-Modified so clients can conditional GET and detect updates
+                try {
+                    const stat = fs.statSync(safePath)
+                    const etag = `W/"${stat.size}-${stat.mtimeMs}"`
+                    res.setHeader('ETag', etag)
+                    res.setHeader('Last-Modified', stat.mtime.toUTCString())
+                    const ifNoneMatch = req.headers['if-none-match']
+                    const ifModifiedSince = req.headers['if-modified-since']
+                    if (ifNoneMatch === etag || (ifModifiedSince && new Date(ifModifiedSince).getTime() >= stat.mtimeMs)) {
+                        res.statusCode = 304
+                        res.end()
+                        return
+                    }
+                } catch (e) {
+                    // ignore stat errors and continue to serve the file
+                }
+                // Helpful debug: log when serving content.json
+                if (path.basename(safePath) === 'content.json') {
+                    try { console.log('[server] serving content.json from', safePath) } catch (e) { }
+                }
                 const stream = fs.createReadStream(safePath)
                 stream.pipe(res)
                 stream.on('error', () => {

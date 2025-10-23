@@ -80,6 +80,57 @@ function inferFilesFromManifest(manifest, baseUrl) {
     return Array.from(files)
 }
 
+// Parse HTML content and extract asset URLs (src/href and inline CSS url(...)).
+function parseHtmlForAssets(html, baseUrl) {
+    const urls = new Set()
+    if (!html) return []
+    // extract src and href attributes
+    const attrRe = /(?:src|href)\s*=\s*["']([^"']+)["']/gi
+    let m
+    while ((m = attrRe.exec(html)) !== null) {
+        const v = m[1].trim()
+        if (!v) continue
+        if (v.startsWith('data:')) continue
+        if (v.startsWith('javascript:')) continue
+        try {
+            const resolved = new URL(v, baseUrl).toString()
+            urls.add(resolved)
+        } catch (e) {
+            // ignore bad urls
+        }
+    }
+    // also look for inline style url(...) occurrences
+    const cssUrlRe = /url\((?:\s*['"]?)([^'")]+)(?:['"]?\s*)\)/gi
+    while ((m = cssUrlRe.exec(html)) !== null) {
+        const v = m[1].trim()
+        if (!v) continue
+        if (v.startsWith('data:')) continue
+        try {
+            const resolved = new URL(v, baseUrl).toString()
+            urls.add(resolved)
+        } catch (e) { }
+    }
+    return Array.from(urls)
+}
+
+// Parse CSS text and return referenced urls via url(...)
+function parseCssForAssets(cssText, baseUrl) {
+    const urls = new Set()
+    if (!cssText) return []
+    const cssUrlRe = /url\((?:\s*['"]?)([^'")]+)(?:['"]?\s*)\)/gi
+    let m
+    while ((m = cssUrlRe.exec(cssText)) !== null) {
+        const v = m[1].trim()
+        if (!v) continue
+        if (v.startsWith('data:')) continue
+        try {
+            const resolved = new URL(v, baseUrl).toString()
+            urls.add(resolved)
+        } catch (e) { }
+    }
+    return Array.from(urls)
+}
+
 async function runUpdater(options) {
     // options: { distDir, remoteBaseUrl, onProgress }
     const distDir = options.distDir
@@ -118,6 +169,7 @@ async function runUpdater(options) {
 
     let remote
     try { remote = JSON.parse(remoteRaw) } catch (e) { throw new Error('Remote content.json parse error: ' + e.message) }
+    console.log(remote.books.length);
 
     const localVer = local && local.version ? local.version : null
     const remoteVer = remote && remote.version ? remote.version : null
@@ -134,8 +186,33 @@ async function runUpdater(options) {
             return { url, path: f.path || path.basename(url), size: f.size }
         })
     } else {
+        // infer from manifest
         const inferred = inferFilesFromManifest(remote, remoteBaseUrl)
-        filesToDownload = inferred.map(u => ({ url: u, path: (new URL(u)).pathname }))
+
+        // also try to fetch index.html and parse it for assets (scripts, links, imgs, sources)
+        let indexAssets = []
+        try {
+            const indexHtml = await fetchText(remoteBaseUrl + '/index.html', 6000)
+            indexAssets = parseHtmlForAssets(indexHtml, remoteBaseUrl)
+            // for any linked CSS files, fetch them and extract url(...) references
+            const cssFiles = indexAssets.filter(u => u.endsWith('.css'))
+            for (const cssUrl of cssFiles) {
+                try {
+                    const cssText = await fetchText(cssUrl, 5000)
+                    const cssAssets = parseCssForAssets(cssText, cssUrl)
+                    for (const a of cssAssets) indexAssets.push(a)
+                } catch (e) {
+                    // ignore CSS fetch errors
+                }
+            }
+        } catch (e) {
+            console.warn('[updater] could not fetch/parse index.html:', e && e.message)
+        }
+
+        const merged = new Set(inferred.concat(indexAssets))
+        // ensure index.html itself is included
+        merged.add((new URL('/index.html', remoteBaseUrl)).toString())
+        filesToDownload = Array.from(merged).map(u => ({ url: u, path: (new URL(u)).pathname }))
     }
 
     // Phase 2: create folders in temp area (report progress between 5-15%)
@@ -220,6 +297,12 @@ async function runUpdater(options) {
         fs.rmSync(distBak, { recursive: true, force: true })
         // cleanup tmpRoot
         fs.rmSync(tmpRoot, { recursive: true, force: true })
+        // write a small marker to help debug and to indicate update time
+        try {
+            const marker = path.join(distDir, '.updated_at')
+            fs.writeFileSync(marker, new Date().toISOString(), 'utf8')
+            console.log('[updater] update completed, marker written to', marker)
+        } catch (e) { }
     } catch (e) {
         // attempt rollback
         try { if (fs.existsSync(distBak) && !fs.existsSync(distDir)) fs.renameSync(distBak, distDir) } catch (e2) { }
