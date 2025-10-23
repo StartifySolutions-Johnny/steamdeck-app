@@ -1,0 +1,229 @@
+{
+    "version": "1.0.0",
+    "books": [
+        {
+            "id": 0,
+            "cover": "cover.png",
+            "title": "MARK BIO",
+            "template": 1,
+            "content": [
+                {
+                    "type": "heading",
+                    "text": "Mark B. Barron"
+                },
+                {
+                    "type": "image",
+                    "src": "/books/0/cover.png",
+                    "alt": "Mark B. Barron",
+                    "caption": "Mark B. Barron - cover"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Mark B. Barron — Technologist who works on extraordinarily difficult projects. CapitalCrew inventor Mark Barron started his first business as a child and has remained driven by new challenges ever since. Born January 15, 1958 in San Diego to Navy Seal Ace Bowen and his wife Julie, Barron relocated to Los Angeles at age five, began selling baby chicks at seven, and faced early struggles with dyslexia and school discipline. He attended Chaminade in Chatsworth for structure and reform school for one year. Later, while visiting a video game store on 5th Avenue with his young son, he observed there were no games encouraging positive development—only violent titles like Grand Theft Auto and Mortal Kombat—which inspired his mission to innovate educational gaming. Barron, an inventor from Los Angeles with patents spanning decades, has worked on solutions from preventing chemotherapy hair loss to developing exterior safety systems for mass transit. Neurodivergent since childhood, his unique perspective fueled empathy for kids trapped in cycles that lead to incarceration in a country housing 25% of the world’s prisoners."
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Determined to make gaming both fun and formative, Barron created 'Trust Fund Battle,' a dedicated game platform where players complete courses and levels to earn real monetary rewards deposited in U.S. Treasury-certified trust accounts. His vision is that even marginalized youth can build assets for their future while playing. Barron aims to partner with major game studios and community leaders to blend entertainment with education in a way that supports parents and prevents youth incarceration. His next project, 'I SCORE,' expands upon this vision, rewarding adolescents for learning and positive behavior. 'I SCORE' monitors progress with eye-recognition tech, offers rewards for achievements, and can support employer vetting or even military MOS/AFSC classifications. Topics explored include 'carnivore capitalism,' corporate excess, prison industry insights, and more—presented with energy and cultural relevance."
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Barron’s career includes many demanding inventions: PTS (Public Transportation Safety International Corp.), a global leader in mass transit safety systems; Consumeron, a remote visual shopping platform; gun safety technologies; the Dry Line system to prevent trailer fuel line explosions; and Chemo Cap, a scalp-cooling system for chemotherapy patients. Public Transportation Safety International’s S-1 Gard dangerzone deflector protects people from bus wheel injuries, deployed in cities like Los Angeles and D.C. His Bel Air X platform brings telepresent shopping via live visual feeds from stores to consumers. Living in Bel Air since purchasing Quincy Jones’s former home in 2005, Barron legally changed his name to Mark Bowen Barron in 2010. His journey from reform school student to multi-patented inventor demonstrates a lifetime dedicated to solving difficult systemic problems and building safe, empowering technology."
+                }
+            ]
+        },
+        {
+            "id": 1,
+            "cover": "cover.jpg",
+            "title": "BLOCK #3 TREASURY AND TRUMP INITIATIVES",
+            "template": 1,
+            "content": [
+                {
+                    "type": "heading",
+                    "text": "Trump's Remarks on $1,000 Trump Accounts for Kids (June 9, 2025)"
+                },
+                {
+                    "type": "video",
+                    "src": "/books/1/video.mp4"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Clip from the GOP roundtable focusing on the proposal's pro-family aspects — https://www.youtube.com/watch?v=XDCO0UkpSSA — features comments by Mike Johnson on investing early in kids for a stronger future. President Trump’s initiative introduces '$1,000 Trump Accounts,' a $1,000 tax-deferred investment for every newborn child as part of 'The One Big Beautiful Bill,' intended to boost financial literacy and long-term prosperity. He first discussed this program in detail during the Invest America Roundtable on June 9, 2025, hosted at the White House alongside CEOs from Uber and Dell, who pledged matching contributions for employees’ children. Treasury Secretary Scott Bessent reinforced the vision through a press release (Sept 24, 2025, https://home.treasury.gov/news/press-releases/sb0262) and a Breitbart interview (July 30, 2025), describing it as a transformative financial education policy supported by partners like Charter, Dell, and Uber."
+                },
+                {
+                    "type": "heading",
+                    "text": "Does the Treasury get involved in funding programs that help reduce crime?"
+                },
+                {
+                    "type": "image",
+                    "src": "/books/1/cover.jpg",
+                    "alt": "Treasury & initiatives",
+                    "caption": "Treasury initiatives (cover)"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Yes. Treasury issued guidance permitting use of funds for initiatives addressing pandemic-related spikes in violence and gun crime, as part of interagency public safety efforts. The American Rescue Plan (ARP) has funded community-based programs nationwide: Indianapolis invested $45 million for grassroots violence reduction, Philadelphia allocated $25.8 million for Group-Violence and Crisis Interventions, and Atlanta set aside $5 million to expand Cure Violence outreach. Other projects, like Houston’s $21 million Mobile Crisis Team and L.A. County’s $18.5 million 9-8-8/9-1-1 integration, divert nonviolent calls away from police. Workforce developmental efforts include youth employment and reentry training across Boston ($3M), Chicago ($10M), and Connecticut ($4M)."
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Altogether, more than $10 billion from ARP has supported violence prevention, crisis response, and reentry programs across 300+ communities in over half the U.S. states. Treasury’s coordination role in disbursing these funds makes it a central enabler of local public safety improvements. These align with long-standing federal programs like Project Safe Neighborhoods and Safe Schools. The Biden administration’s ARP announcement received no Republican votes (https://www.youtube.com/watch?v=UOuYicMVA5s), while Trump’s newer initiatives, such as the Trump Accounts, focus on economic empowerment as crime prevention through early savings and financial education."
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "cover": "cover.jpg",
+            "title": "BLOCK #4 'THE POWER OF PLAY'",
+            "template": 1,
+            "content": [
+                {
+                    "type": "heading",
+                    "text": "BLOCK #4 \u201cTHE POWER OF PLAY\u201d"
+                },
+                {
+                    "type": "image",
+                    "src": "/books/2/cover.jpg",
+                    "alt": "The Power of Play - cover",
+                    "caption": "The Power of Play"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "BLOCK #4 'THE POWER OF PLAY' explores supporting research demonstrating the educational and developmental benefits of gaming. The Entertainment Software Association (https://www.theesa.com/) serves as a leading source of data and analysis on the growth of the global video game industry, illustrating how interactive entertainment increasingly contributes to skill-building, cognition, and learning outcomes. Games can promote strategic thinking, cooperation, and creative problem solving. Industry reports emphasize that gaming has become one of the fastest-evolving educational ecosystems—bridging play and purposeful engagement."
+                },
+                {
+                    "type": "image",
+                    "src": "/books/2/1.jpg",
+                    "alt": "Gaming growth chart",
+                    "caption": "Industry growth"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "The Joan Ganz Cooney Center (https://joanganzcooneycenter.org/) further demonstrates how gaming and digital media improve learning through research on emerging technology, co-design, and youth development. The Center collaborates with technologists, producers, educators, and young people themselves, amplifying children’s voices in creating digital tools that enhance well-being and academic success. As stated on their site: 'We conduct research on emerging technologies and collaborate with technologists, digital media producers, and educators to put this research into action to support children’s learning and well-being. We facilitate an international network of researchers and partner with young people themselves, elevating their voices in our research and engaging them in co-designing digital media experiences. We also work directly with policymakers and investors to drive national conversations and decisions that help children thrive within our digital world.'"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "cover": "cover.jpg",
+            "title": "BLOCK #5 Engaging Major Gaming Houses",
+            "template": 0,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "text": "We have engaged and are in dialogue with the major gaming houses to produce and operate Trust Fund Battle (TFB) for the U.S. These partnerships aim to unite top industry studios—those with the creative skill and infrastructure to deliver nationwide educational gaming—under one mission: combining entertainment value with measurable personal growth. Aligning commercial developers with social impact goals allows the project to maintain modern gameplay standards while serving a public good."
+                },
+                {
+                    "type": "image",
+                    "src": "/books/3/cover.jpg",
+                    "alt": "Gaming houses",
+                    "caption": "Major gaming partners"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "The initiative acknowledges that major publishers drive global cultural influence—and their creativity can be harnessed for education, empowerment, and financial literacy. Collaborating with them is crucial to ensure large-scale quality production, optimized engagement, and professional-level gamification that inspires learning, resilience, and opportunity for youth. These strategic alliances position Trust Fund Battle as both a social innovation and a next-generation entertainment platform designed for transformation."
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "cover": "cover.jpg",
+            "title": "BLOCK #6 HHS & MAHA",
+            "template": 1,
+            "content": [
+                {
+                    "type": "image",
+                    "src": "/books/4/cover.jpg",
+                    "alt": "HHS & MAHA",
+                    "caption": "HHS & MAHA - cover"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "\u201cSafer Tomorrows: HHS, ACYF, and DOJ Unite Against Youth Crime.\u201d [FADE IN: orchestral music and children playing.] NARRATOR: Welcome to 'Health Horizons Spotlight.' Discover how the U.S. Department of Health and Human Services, under Secretary Robert F. Kennedy Jr., is transforming lives through 'Make America Healthy Again' (MAHA). The initiative, launched in 2025, tackles America’s chronic disease crisis—impacting one in two adults—through proactive strategies such as eliminating petroleum dyes, integrating nutrition in medical education, and addressing environmental toxins that destabilize health and communities. MAHA’s core principle is prevention through empowerment. Its partnership with ACYF and DOJ exemplifies cross-agency collaboration for safer futures and stronger families."
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Using the 'MAHA in Action' tracker, HHS reorganizes programs and resources to reinforce resilience at home and in communities. Secretary Kennedy has emphasized 'restoring trust and prioritizing prevention over profit.' Acting Commissioner Cheri Hoffman leads the Administration on Children, Youth, and Families (ACYF), managing over $13 billion for family stability, child welfare, and abuse prevention. Through initiatives like the Children’s Justice Act and the Family Violence Prevention Program, ACYF provides tools that directly reduce trauma and delinquency risks. Her 2025–2029 plan integrates data-driven strategies aligned with MAHA’s health mission to ensure trauma is prevented before it occurs."
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Collaborating with the Department of Justice, the Office of Juvenile Justice and Delinquency Prevention (OJJDP) delivers programs like 'Strategies to Support Children Exposed to Violence,' which fund trauma-informed interventions and community mentoring reducing victimization by up to 40%. Supported by the Juvenile Justice Crime Prevention Act, these efforts blend health care, education, and criminal justice partners to address root causes of youth crime. Together, HHS, MAHA, and DOJ build a preventative safety framework — healing wounds, deterring violence, and strengthening communities through evidence-based intervention programs. Visit hhs.gov, justice.gov, acf.gov, ojjdp.ojp.gov, and grants.gov to learn more."
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "cover": "cover.jpg",
+            "title": "BLOCK #3 TREASURY AND TRUMP INITIATIVES",
+            "template": 2,
+            "content": [
+                {
+                    "type": "heading",
+                    "text": "Trump's Remarks on $1,000 Trump Accounts for Kids (June 9, 2025)"
+                },
+                {
+                    "type": "video",
+                    "src": "/books/1/video.mp4"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Clip from the GOP roundtable focusing on the proposal's pro-family aspects — https://www.youtube.com/watch?v=XDCO0UkpSSA — features comments by Mike Johnson on investing early in kids for a stronger future. President Trump’s initiative introduces '$1,000 Trump Accounts,' a $1,000 tax-deferred investment for every newborn child as part of 'The One Big Beautiful Bill,' intended to boost financial literacy and long-term prosperity. He first discussed this program in detail during the Invest America Roundtable on June 9, 2025, hosted at the White House alongside CEOs from Uber and Dell, who pledged matching contributions for employees’ children. Treasury Secretary Scott Bessent reinforced the vision through a press release (Sept 24, 2025, https://home.treasury.gov/news/press-releases/sb0262) and a Breitbart interview (July 30, 2025), describing it as a transformative financial education policy supported by partners like Charter, Dell, and Uber."
+                },
+                {
+                    "type": "heading",
+                    "text": "Does the Treasury get involved in funding programs that help reduce crime?"
+                },
+                {
+                    "type": "image",
+                    "src": "/books/1/cover.jpg",
+                    "alt": "Treasury & initiatives",
+                    "caption": "Treasury initiatives (cover)"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Yes. Treasury issued guidance permitting use of funds for initiatives addressing pandemic-related spikes in violence and gun crime, as part of interagency public safety efforts. The American Rescue Plan (ARP) has funded community-based programs nationwide: Indianapolis invested $45 million for grassroots violence reduction, Philadelphia allocated $25.8 million for Group-Violence and Crisis Interventions, and Atlanta set aside $5 million to expand Cure Violence outreach. Other projects, like Houston’s $21 million Mobile Crisis Team and L.A. County’s $18.5 million 9-8-8/9-1-1 integration, divert nonviolent calls away from police. Workforce developmental efforts include youth employment and reentry training across Boston ($3M), Chicago ($10M), and Connecticut ($4M)."
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Altogether, more than $10 billion from ARP has supported violence prevention, crisis response, and reentry programs across 300+ communities in over half the U.S. states. Treasury’s coordination role in disbursing these funds makes it a central enabler of local public safety improvements. These align with long-standing federal programs like Project Safe Neighborhoods and Safe Schools. The Biden administration’s ARP announcement received no Republican votes (https://www.youtube.com/watch?v=UOuYicMVA5s), while Trump’s newer initiatives, such as the Trump Accounts, focus on economic empowerment as crime prevention through early savings and financial education."
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "cover": "cover.jpg",
+            "title": "TEST",
+            "template": 2,
+            "content": [
+                {
+                    "type": "heading",
+                    "text": "Trump's Remarks on $1,000 Trump Accounts for Kids (June 9, 2025)"
+                },
+                {
+                    "type": "video",
+                    "src": "/books/1/video.mp4"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Clip from the GOP roundtable focusing on the proposal's pro-family aspects — https://www.youtube.com/watch?v=XDCO0UkpSSA — features comments by Mike Johnson on investing early in kids for a stronger future. President Trump’s initiative introduces '$1,000 Trump Accounts,' a $1,000 tax-deferred investment for every newborn child as part of 'The One Big Beautiful Bill,' intended to boost financial literacy and long-term prosperity. He first discussed this program in detail during the Invest America Roundtable on June 9, 2025, hosted at the White House alongside CEOs from Uber and Dell, who pledged matching contributions for employees’ children. Treasury Secretary Scott Bessent reinforced the vision through a press release (Sept 24, 2025, https://home.treasury.gov/news/press-releases/sb0262) and a Breitbart interview (July 30, 2025), describing it as a transformative financial education policy supported by partners like Charter, Dell, and Uber."
+                },
+                {
+                    "type": "heading",
+                    "text": "Does the Treasury get involved in funding programs that help reduce crime?"
+                },
+                {
+                    "type": "image",
+                    "src": "/books/1/cover.jpg",
+                    "alt": "Treasury & initiatives",
+                    "caption": "Treasury initiatives (cover)"
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Yes. Treasury issued guidance permitting use of funds for initiatives addressing pandemic-related spikes in violence and gun crime, as part of interagency public safety efforts. The American Rescue Plan (ARP) has funded community-based programs nationwide: Indianapolis invested $45 million for grassroots violence reduction, Philadelphia allocated $25.8 million for Group-Violence and Crisis Interventions, and Atlanta set aside $5 million to expand Cure Violence outreach. Other projects, like Houston’s $21 million Mobile Crisis Team and L.A. County’s $18.5 million 9-8-8/9-1-1 integration, divert nonviolent calls away from police. Workforce developmental efforts include youth employment and reentry training across Boston ($3M), Chicago ($10M), and Connecticut ($4M)."
+                },
+                {
+                    "type": "paragraph",
+                    "text": "Altogether, more than $10 billion from ARP has supported violence prevention, crisis response, and reentry programs across 300+ communities in over half the U.S. states. Treasury’s coordination role in disbursing these funds makes it a central enabler of local public safety improvements. These align with long-standing federal programs like Project Safe Neighborhoods and Safe Schools. The Biden administration’s ARP announcement received no Republican votes (https://www.youtube.com/watch?v=UOuYicMVA5s), while Trump’s newer initiatives, such as the Trump Accounts, focus on economic empowerment as crime prevention through early savings and financial education."
+                }
+            ]
+        }
+    ]
+}
