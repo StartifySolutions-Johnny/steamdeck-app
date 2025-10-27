@@ -222,6 +222,9 @@ async function runUpdater(options) {
 
     emitStatus('Creating folders...')
     console.log('[updater] Phase 2: creating folders')
+    // Debug: list files we plan to download
+    console.log('[updater] filesToDownload:', filesToDownload.map(f => ({ url: f.url, path: f.path, size: f.size })))
+
     const totalFiles = filesToDownload.length
     for (let i = 0; i < totalFiles; i++) {
         const f = filesToDownload[i]
@@ -246,13 +249,22 @@ async function runUpdater(options) {
         const relPath = u.pathname.replace(/^\//, '')
         const dest = path.join(tmpRoot, relPath)
         try {
-            await downloadToFile(f.url, dest, 20000, (progress) => {
+            // increase per-file timeout for potentially large video files (120s)
+            await downloadToFile(f.url, dest, 120000, (progress) => {
                 // progress: compute overall percent mapping
                 const fileFraction = totalFiles > 0 ? (idx + (progress.total ? (progress.received / progress.total) : 0)) / totalFiles : 0
                 const overall = PHASE.CREATE_MAX + fileFraction * (100 - PHASE.CREATE_MAX)
                 emitProgress(Math.min(100, overall), `Downloading ${relPath}`)
             })
             downloaded++
+            // Verify file size is non-zero
+            try {
+                const st = fs.statSync(dest)
+                if (!st || st.size === 0) throw new Error('Downloaded file size is zero')
+            } catch (statErr) {
+                try { fs.rmSync(dest, { force: true }) } catch (e) { }
+                throw new Error(`Downloaded file invalid for ${f.url}: ${statErr && statErr.message}`)
+            }
             const overallAfter = PHASE.CREATE_MAX + (downloaded / totalFiles) * (100 - PHASE.CREATE_MAX)
             emitProgress(Math.min(100, overallAfter), `Downloaded ${relPath}`)
             console.log(`[updater] Downloaded ${relPath}`)

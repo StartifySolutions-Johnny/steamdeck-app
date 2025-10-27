@@ -1,7 +1,12 @@
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
+const say = require('say');
+
+ipcMain.handle('tts:speak', async (_, text) => {
+    say.speak(text);
+});
 
 // Helper: fetch JSON with timeout
 function fetchJson(url, timeout = 5000) {
@@ -31,7 +36,8 @@ async function createWindow() {
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false
-        }
+        },
+        preload: path.join(__dirname, 'preload.js')
     })
 
     // Resolve possible dist locations. When packaged, electron-builder may
@@ -136,7 +142,7 @@ async function createWindow() {
         try {
             // notify UI we're starting
             onStatus('Starting update...')
-            const res = await updater.runUpdater({ distDir, remoteBaseUrl: 'https://nintendo-switch-ui-9e01d8018d0a.herokuapp.com', onProgress })
+            const res = await updater.runUpdater({ distDir, remoteBaseUrl: 'https://nintendo-switch-content-ee8d316db220.herokuapp.com', onProgress })
             if (res && res.updated) console.log('Updater applied: ', res)
             else console.log('Updater: no update required', res)
             onStatus('Update complete')
@@ -197,6 +203,10 @@ async function createWindow() {
                     '.png': 'image/png',
                     '.jpg': 'image/jpeg',
                     '.jpeg': 'image/jpeg',
+                    '.mp4': 'video/mp4',
+                    '.webm': 'video/webm',
+                    '.ogg': 'video/ogg',
+                    '.mp3': 'audio/mpeg',
                     '.svg': 'image/svg+xml',
                     '.woff': 'font/woff',
                     '.woff2': 'font/woff2',
