@@ -56,5 +56,8 @@
       ],
       "category": "Utility"
     }
+  },
+  "dependencies": {
+    "say": "^0.16.0"
   }
 }
