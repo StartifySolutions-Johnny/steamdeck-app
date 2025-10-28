@@ -195,9 +195,9 @@ async function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
-        kiosk: true,
-        fullscreen: true,
-        autoHideMenuBar: true,
+        // kiosk: true,
+        // fullscreen: true,
+        // autoHideMenuBar: true,
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
