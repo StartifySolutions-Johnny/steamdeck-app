@@ -7,3 +7,10 @@ contextBridge.exposeInMainWorld('electronTTS', {
     stop: () => ipcRenderer.invoke('tts:stop'),
     isAvailable: () => ipcRenderer.invoke('tts:isAvailable')
 });
+
+// Expose a tiny auto-start/systemctl bridge to the renderer. Only works on
+// Linux where `systemctl --user` is available. Methods return Promises.
+contextBridge.exposeInMainWorld('electronAutoStart', {
+    getStatus: () => ipcRenderer.invoke('autostart:status'),
+    setEnabled: (enabled) => ipcRenderer.invoke('autostart:set', enabled)
+});
