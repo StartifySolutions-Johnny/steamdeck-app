@@ -23,16 +23,10 @@ contextBridge.exposeInMainWorld('electronAutoStart', {
 // sudo password (if required). This bridge simply forwards to main.
 contextBridge.exposeInMainWorld('electronSystem', {
     poweroff: (password) => ipcRenderer.invoke('system:power', 'poweroff', password),
-    reboot: (password) => ipcRenderer.invoke('system:power', 'reboot', password)
-});
-
-// Stop the user service and quit the app
-contextBridge.exposeInMainWorld('electronSystem', {
-    // preserve existing methods (redefine safe-access)
-    poweroff: (password) => ipcRenderer.invoke('system:power', 'poweroff', password),
     reboot: (password) => ipcRenderer.invoke('system:power', 'reboot', password),
     closeApp: () => ipcRenderer.invoke('system:stop-and-quit')
 });
+
 
 // Small ready flag the renderer can check quickly to determine if the
 // preload bridge loaded at all.
