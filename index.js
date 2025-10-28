@@ -37,7 +37,7 @@ autoUpdater.on("update-downloaded", (info) => {
             try {
                 const execDir = path.dirname(process.execPath || process.resourcesPath || __dirname)
                 // use a shell so the wildcard expands
-                const cmd = "sh -c \"ln -sf Gamepad-App-*.AppImage Gamepad-App.AppImage\""
+                const cmd = "sh -c \"ln -sf ~/Applications/Gamepad-App-*.AppImage ~/Applications/Gamepad-App.AppImage\""
                 log.info('[updater] creating AppImage symlink in', execDir)
                 exec(cmd, { cwd: execDir }, (err, stdout, stderr) => {
                     if (err) log.warn('[updater] symlink failed', err && err.message)
@@ -195,9 +195,9 @@ async function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
-        kiosk: true,
-        fullscreen: true,
-        autoHideMenuBar: true,
+        // kiosk: true,
+        // fullscreen: true,
+        // autoHideMenuBar: true,
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
