@@ -510,3 +510,61 @@ ipcMain.handle('autostart:set', async (_, enabled) => {
         return { ok: false, error: String(e) }
     }
 })
+
+// IPC: perform a system power action using sudo. Expects 'poweroff' or 'reboot'.
+// WARNING: this will write the provided password to the stdin of sudo. That is
+// potentially insecure. The UI currently sends the password 'butterfly'.
+ipcMain.handle('system:power', async (_, action, password) => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false, error: 'Unsupported platform' }
+        if (!['poweroff', 'reboot'].includes(action)) return { ok: false, error: 'Invalid action' }
+
+        // Basic password check - caller asked to use 'butterfly'. We still allow any
+        // password to be passed, but you can enforce matching here if desired.
+        // if (password !== 'butterfly') return { ok: false, error: 'Incorrect password' }
+
+        // Use sudo -S to read password from stdin and -p '' to suppress prompt text
+        const cmd = 'sudo'
+        const args = ['-S', '-p', '', action]
+        const spawned = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] })
+
+        let stdout = ''
+        let stderr = ''
+        spawned.stdout.on('data', (d) => { stdout += String(d || '') })
+        spawned.stderr.on('data', (d) => { stderr += String(d || '') })
+
+        // write password + newline
+        spawned.stdin.write(String(password || '') + '\n')
+        spawned.stdin.end()
+
+        const exit = await new Promise((resolve) => spawned.on('exit', resolve))
+        if (exit === 0) return { ok: true, supported: true, stdout, stderr }
+        return { ok: false, supported: true, exitCode: exit, stdout, stderr }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
+// IPC: stop the user service and quit the app (Linux only)
+ipcMain.handle('system:stop-and-quit', async () => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false, error: 'Unsupported platform' }
+
+        // Stop the user service (no sudo expected for --user)
+        try {
+            await execPromise('systemctl --user stop gamepad-overlay.service')
+        } catch (e) {
+            // continue even if stopping the service failed; return info
+            console.warn('Failed to stop service:', e && e.message)
+        }
+
+        // Quit the Electron app gracefully after a short delay to allow IPC reply
+        setTimeout(() => {
+            try { app.quit() } catch (e) { try { process.exit(0) } catch (ee) { } }
+        }, 300)
+
+        return { ok: true, supported: true }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
