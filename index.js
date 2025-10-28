@@ -175,11 +175,40 @@ async function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
+        kiosk: true,
+        fullscreen: true,
+        autoHideMenuBar: true,
         webPreferences: {
             contextIsolation: true,
-            nodeIntegration: false
-        },
-        preload: path.join(__dirname, 'preload.js')
+            nodeIntegration: false,
+            preload: path.join(__dirname, 'preload.js')
+        }
+    })
+
+    // enforce kiosk/fullscreen and remove menu
+    try { win.setKiosk(true); win.setFullScreen(true); win.removeMenu() } catch (e) { }
+
+    // Re-enter fullscreen/kiosk if the window leaves it for any reason
+    win.on('leave-full-screen', () => { try { win.setFullScreen(true); win.setKiosk(true) } catch (e) { } })
+    win.on('enter-html-full-screen', () => { try { win.setFullScreen(true); win.setKiosk(true) } catch (e) { } })
+
+    // Block common keyboard shortcuts that could exit fullscreen or close the window
+    win.webContents.on('before-input-event', (event, input) => {
+        const ctrlOrCmd = input.control || input.meta
+        const alt = input.alt
+        const key = (input.key || '').toLowerCase()
+
+        // block: F11, Escape, Ctrl/Cmd+W, Alt+F4, Ctrl/Cmd+R, Ctrl/Cmd+Shift+I (devtools)
+        if (
+            input.code === 'F11' ||
+            key === 'escape' ||
+            (ctrlOrCmd && key === 'w') ||
+            (alt && input.code === 'F4') ||
+            (ctrlOrCmd && key === 'r') ||
+            (ctrlOrCmd && input.shift && key === 'i')
+        ) {
+            event.preventDefault()
+        }
     })
 
     // Resolve possible dist locations. When packaged, electron-builder may
