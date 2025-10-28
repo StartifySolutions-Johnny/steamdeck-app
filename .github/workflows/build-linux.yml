@@ -61,11 +61,9 @@ jobs:
             libappindicator3-1 || true
 
       - name: Install deps for steamdeck-app
-        working-directory: steamdeck-app
         run: npm ci
 
       - name: Build and publish AppImage via electron-builder
-        working-directory: steamdeck-app
         run: |
           # Build and auto-upload to GitHub Releases
           npx electron-builder --linux AppImage --publish always
