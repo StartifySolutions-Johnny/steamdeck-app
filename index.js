@@ -30,6 +30,26 @@ autoUpdater.on("download-progress", (progress) => {
 
 autoUpdater.on("update-downloaded", (info) => {
     log.info("Update downloaded, will install on quit");
+    try {
+        // If running on Linux try to create a stable symlink to the new AppImage
+        // so the systemd service can reference a predictable filename.
+        if (process.platform === 'linux') {
+            try {
+                const execDir = path.dirname(process.execPath || process.resourcesPath || __dirname)
+                // use a shell so the wildcard expands
+                const cmd = "sh -c \"ln -sf Gamepad-App-*.AppImage Gamepad-App.AppImage\""
+                log.info('[updater] creating AppImage symlink in', execDir)
+                exec(cmd, { cwd: execDir }, (err, stdout, stderr) => {
+                    if (err) log.warn('[updater] symlink failed', err && err.message)
+                    else log.info('[updater] symlink created')
+                })
+            } catch (e) {
+                log.warn('[updater] failed to create symlink:', e && e.message)
+            }
+        }
+    } catch (e) {
+        log.warn('[updater] post-download hook error:', e && e.message)
+    }
     autoUpdater.quitAndInstall();
 });
 
@@ -506,6 +526,64 @@ ipcMain.handle('autostart:set', async (_, enabled) => {
         try { const r1 = await execPromise('systemctl --user is-enabled gamepad-overlay.service'); enabledNow = String(r1.stdout || '').trim() === 'enabled' } catch (e) { enabledNow = false }
         try { const r2 = await execPromise('systemctl --user is-active gamepad-overlay.service'); activeNow = String(r2.stdout || '').trim() === 'active' } catch (e) { activeNow = false }
         return { ok: true, supported: true, enabled: enabledNow, active: activeNow }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
+// IPC: perform a system power action using sudo. Expects 'poweroff' or 'reboot'.
+// WARNING: this will write the provided password to the stdin of sudo. That is
+// potentially insecure. The UI currently sends the password 'butterfly'.
+ipcMain.handle('system:power', async (_, action, password) => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false, error: 'Unsupported platform' }
+        if (!['poweroff', 'reboot'].includes(action)) return { ok: false, error: 'Invalid action' }
+
+        // Basic password check - caller asked to use 'butterfly'. We still allow any
+        // password to be passed, but you can enforce matching here if desired.
+        // if (password !== 'butterfly') return { ok: false, error: 'Incorrect password' }
+
+        // Use sudo -S to read password from stdin and -p '' to suppress prompt text
+        const cmd = 'sudo'
+        const args = ['-S', '-p', '', action]
+        const spawned = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] })
+
+        let stdout = ''
+        let stderr = ''
+        spawned.stdout.on('data', (d) => { stdout += String(d || '') })
+        spawned.stderr.on('data', (d) => { stderr += String(d || '') })
+
+        // write password + newline
+        spawned.stdin.write(String(password || '') + '\n')
+        spawned.stdin.end()
+
+        const exit = await new Promise((resolve) => spawned.on('exit', resolve))
+        if (exit === 0) return { ok: true, supported: true, stdout, stderr }
+        return { ok: false, supported: true, exitCode: exit, stdout, stderr }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
+// IPC: stop the user service and quit the app (Linux only)
+ipcMain.handle('system:stop-and-quit', async () => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false, error: 'Unsupported platform' }
+
+        // Stop the user service (no sudo expected for --user)
+        try {
+            await execPromise('systemctl --user stop gamepad-overlay.service')
+        } catch (e) {
+            // continue even if stopping the service failed; return info
+            console.warn('Failed to stop service:', e && e.message)
+        }
+
+        // Quit the Electron app gracefully after a short delay to allow IPC reply
+        setTimeout(() => {
+            try { app.quit() } catch (e) { try { process.exit(0) } catch (ee) { } }
+        }, 300)
+
+        return { ok: true, supported: true }
     } catch (e) {
         return { ok: false, error: String(e) }
     }
