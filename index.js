@@ -30,6 +30,26 @@ autoUpdater.on("download-progress", (progress) => {
 
 autoUpdater.on("update-downloaded", (info) => {
     log.info("Update downloaded, will install on quit");
+    try {
+        // If running on Linux try to create a stable symlink to the new AppImage
+        // so the systemd service can reference a predictable filename.
+        if (process.platform === 'linux') {
+            try {
+                const execDir = path.dirname(process.execPath || process.resourcesPath || __dirname)
+                // use a shell so the wildcard expands
+                const cmd = "sh -c \"ln -sf Gamepad-App-*.AppImage Gamepad-App.AppImage\""
+                log.info('[updater] creating AppImage symlink in', execDir)
+                exec(cmd, { cwd: execDir }, (err, stdout, stderr) => {
+                    if (err) log.warn('[updater] symlink failed', err && err.message)
+                    else log.info('[updater] symlink created')
+                })
+            } catch (e) {
+                log.warn('[updater] failed to create symlink:', e && e.message)
+            }
+        }
+    } catch (e) {
+        log.warn('[updater] post-download hook error:', e && e.message)
+    }
     autoUpdater.quitAndInstall();
 });
 
