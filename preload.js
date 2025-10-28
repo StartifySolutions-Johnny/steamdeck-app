@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('electronAutoStart', {
 contextBridge.exposeInMainWorld('electronSystem', {
     poweroff: (password) => ipcRenderer.invoke('system:power', 'poweroff', password),
     reboot: (password) => ipcRenderer.invoke('system:power', 'reboot', password),
-    closeApp: () => ipcRenderer.invoke('system:stop-and-quit')
+    closeApp: (password) => ipcRenderer.invoke('system:stop-and-quit', password)
 });
 
 
