@@ -202,12 +202,12 @@ async function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
             preload: path.join(__dirname, 'preload.js'),
-            devTools: true
+            // devTools: true
         }
     })
 
     // Open DevTools
-    try { win.webContents.openDevTools({ mode: 'undocked' }) } catch (e) { }
+    // try { win.webContents.openDevTools({ mode: 'undocked' }) } catch (e) { }
 
     try {
         // Diagnostic log: confirm which preload path is being used
