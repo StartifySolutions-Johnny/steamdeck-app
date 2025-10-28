@@ -1,6 +1,6 @@
 {
   "name": "steamdeck-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,8 @@
       {
         "provider": "github",
         "owner": "StartifySolutions-Johnny",
-        "repo": "steamdeck-app"
+        "repo": "steamdeck-app",
+        "releaseType": "release"
       }
     ],
     "directories": {
