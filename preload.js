@@ -31,3 +31,12 @@ contextBridge.exposeInMainWorld('electronSystem', {
 // Small ready flag the renderer can check quickly to determine if the
 // preload bridge loaded at all.
 try { contextBridge.exposeInMainWorld('__electron_bridge_loaded', true) } catch (e) { }
+
+// Expose nmcli-based Wi-Fi controls (Linux). Methods return Promises.
+contextBridge.exposeInMainWorld('electronWifi', {
+    scan: () => ipcRenderer.invoke('wifi:scan'),
+    connect: (ssid, password) => ipcRenderer.invoke('wifi:connect', ssid, password),
+    disconnect: (ssid) => ipcRenderer.invoke('wifi:disconnect', ssid),
+    list: () => ipcRenderer.invoke('wifi:list'),
+    status: (ssid) => ipcRenderer.invoke('wifi:status', ssid)
+});

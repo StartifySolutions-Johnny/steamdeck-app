@@ -656,3 +656,104 @@ ipcMain.handle('system:stop-and-quit', async (_, password) => {
         return { ok: false, error: String(e) }
     }
 })
+
+// Wi-Fi management via nmcli (Linux only)
+ipcMain.handle('wifi:scan', async () => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        // list wifi access points in terse format: SSID:SECURITY:SIGNAL:BARS
+        const cmd = 'nmcli -t -f SSID,SECURITY,SIGNAL,BARS device wifi list'
+        const out = await execPromise(cmd)
+        const lines = String(out.stdout || '').split('\n').map(l => l.trim()).filter(Boolean)
+        const networks = []
+        for (const line of lines) {
+            // SSID:SECURITY:SIGNAL:BARS (SSID may contain colons, so split from the end)
+            const parts = line.split(':')
+            if (parts.length < 4) continue
+            const bars = parts.pop()
+            const signal = parts.pop()
+            const security = parts.pop()
+            const ssid = parts.join(':')
+            networks.push({ ssid, security, signal: Number(signal || 0), bars })
+        }
+        return { ok: true, supported: true, networks }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
+ipcMain.handle('wifi:list', async () => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        // show known connections
+        const out = await execPromise('nmcli -t -f NAME,UUID,TYPE connection show')
+        const lines = String(out.stdout || '').split('\n').map(l => l.trim()).filter(Boolean)
+        const conns = lines.map(l => {
+            const [name, uuid, type] = l.split(':')
+            return { name, uuid, type }
+        })
+        return { ok: true, supported: true, connections: conns }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
+ipcMain.handle('wifi:connect', async (_, ssid, password) => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        if (!ssid) return { ok: false, error: 'SSID required' }
+        // Build command: include password only when provided
+        const safeSsid = ssid.replace(/"/g, '\\"')
+        let cmd = `nmcli device wifi connect "${safeSsid}"`
+        if (password) {
+            const safePass = String(password).replace(/"/g, '\\"')
+            cmd += ` password "${safePass}"`
+        }
+        const out = await execPromise(cmd)
+        return { ok: true, supported: true, stdout: out.stdout }
+    } catch (e) {
+        return { ok: false, error: String(e), stderr: e.stderr || null }
+    }
+})
+
+ipcMain.handle('wifi:disconnect', async (_, ssid) => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        if (!ssid) return { ok: false, error: 'SSID required' }
+        // Try to find an active connection matching the SSID and bring it down by UUID
+        try {
+            const active = await execPromise('nmcli -t -f NAME,UUID,DEVICE connection show --active')
+            const lines = String(active.stdout || '').split('\n').map(l => l.trim()).filter(Boolean)
+            for (const l of lines) {
+                const [name, uuid, device] = l.split(':')
+                if (name === ssid) {
+                    await execPromise(`nmcli connection down uuid ${uuid}`)
+                    return { ok: true, supported: true }
+                }
+            }
+        } catch (e) {
+            // fall through to generic disconnect
+        }
+        // fallback: try to delete or deactivate by name
+        try {
+            await execPromise(`nmcli connection down id "${ssid.replace(/"/g, '\\"')}"`)
+            return { ok: true, supported: true }
+        } catch (e) {
+            return { ok: false, error: 'Could not find/stop connection', stderr: String(e) }
+        }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
+ipcMain.handle('wifi:status', async (_, ssid) => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        // show general network status
+        const res = await execPromise('nmcli -t -f STATE general')
+        const state = String(res.stdout || '').trim()
+        return { ok: true, supported: true, state }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
