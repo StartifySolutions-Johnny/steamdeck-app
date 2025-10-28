@@ -3,7 +3,7 @@ const path = require('path')
 const fs = require('fs')
 const http = require('http')
 const say = require('say');
-const { spawn } = require('child_process')
+const { spawn, exec } = require('child_process')
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 
@@ -455,4 +455,58 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+})
+
+// Helper: promisified exec
+function execPromise(cmd, opts = {}) {
+    return new Promise((resolve, reject) => {
+        exec(cmd, opts, (err, stdout, stderr) => {
+            if (err) return reject(err)
+            resolve({ stdout: String(stdout || ''), stderr: String(stderr || '') })
+        })
+    })
+}
+
+// IPC: autostart status / control for systemd --user service (Linux only)
+ipcMain.handle('autostart:status', async () => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        // Check is-enabled and is-active
+        let enabled = false
+        let active = false
+        try {
+            const r1 = await execPromise('systemctl --user is-enabled gamepad-overlay.service')
+            enabled = String(r1.stdout || '').trim() === 'enabled'
+        } catch (e) { enabled = false }
+        try {
+            const r2 = await execPromise('systemctl --user is-active gamepad-overlay.service')
+            active = String(r2.stdout || '').trim() === 'active'
+        } catch (e) { active = false }
+        return { ok: true, supported: true, enabled, active }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
+ipcMain.handle('autostart:set', async (_, enabled) => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        if (enabled) {
+            // enable on boot and start now
+            await execPromise('systemctl --user enable --now gamepad-overlay.service')
+        } else {
+            // disable on boot and stop now
+            await execPromise('systemctl --user disable --now gamepad-overlay.service')
+        }
+        // return updated status
+        const status = await ipcMain.invoke ? await ipcMain.invoke('autostart:status') : null
+        // ipcMain.invoke usually not available here; instead re-run check inline
+        let enabledNow = false
+        let activeNow = false
+        try { const r1 = await execPromise('systemctl --user is-enabled gamepad-overlay.service'); enabledNow = String(r1.stdout || '').trim() === 'enabled' } catch (e) { enabledNow = false }
+        try { const r2 = await execPromise('systemctl --user is-active gamepad-overlay.service'); activeNow = String(r2.stdout || '').trim() === 'active' } catch (e) { activeNow = false }
+        return { ok: true, supported: true, enabled: enabledNow, active: activeNow }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
 })
