@@ -1,4 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
+// Preload startup log — helps diagnose whether the preload script actually
+// executed. This will appear in the renderer DevTools console and in the
+// main process logs depending on configuration.
+try { console.log('[preload] preload.js loaded') } catch (e) { }
 
 // Expose a small TTS bridge to the renderer. Methods return Promises so the
 // renderer can await success/failure if desired.
@@ -29,3 +33,7 @@ contextBridge.exposeInMainWorld('electronSystem', {
     reboot: (password) => ipcRenderer.invoke('system:power', 'reboot', password),
     closeApp: () => ipcRenderer.invoke('system:stop-and-quit')
 });
+
+// Small ready flag the renderer can check quickly to determine if the
+// preload bridge loaded at all.
+try { contextBridge.exposeInMainWorld('__electron_bridge_loaded', true) } catch (e) { }

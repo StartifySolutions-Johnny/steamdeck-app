@@ -205,6 +205,11 @@ async function createWindow() {
         }
     })
 
+    try {
+        // Diagnostic log: confirm which preload path is being used
+        log.info('[main] BrowserWindow preload:', path.join(__dirname, 'preload.js'))
+    } catch (e) { console.log('[main] preload log failed', e && e.message) }
+
     // enforce kiosk/fullscreen and remove menu
     try { win.setKiosk(true); win.setFullScreen(true); win.removeMenu() } catch (e) { }
 
