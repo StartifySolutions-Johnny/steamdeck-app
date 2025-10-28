@@ -195,15 +195,19 @@ async function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
-        // kiosk: true,
-        // fullscreen: true,
-        // autoHideMenuBar: true,
+        kiosk: true,
+        fullscreen: true,
+        autoHideMenuBar: true,
         webPreferences: {
             contextIsolation: true,
             nodeIntegration: false,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'preload.js'),
+            devTools: true
         }
     })
+
+    // Open DevTools
+    try { win.webContents.openDevTools({ mode: 'undocked' }) } catch (e) { }
 
     try {
         // Diagnostic log: confirm which preload path is being used
