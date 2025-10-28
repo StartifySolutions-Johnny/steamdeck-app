@@ -19,6 +19,13 @@
   "build": {
     "appId": "com.startifysolutions.gamepad",
     "productName": "Gamepad App",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "StartifySolutions-Johnny",
+        "repo": "steamdeck-app"
+      }
+    ],
     "directories": {
       "buildResources": "build",
       "output": "release"
@@ -54,10 +61,14 @@
       "target": [
         "AppImage"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "maintainer": "Startify Solutions",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     }
   },
   "dependencies": {
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
     "say": "^0.16.0"
   }
 }
