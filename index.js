@@ -296,34 +296,26 @@ async function createWindow() {
     // It's computed below (may be copied to userData on AppImage) and then reused by the server.
     let resolvedDistDir = null
 
-    // Run the updater to download remote content and books when available.
-    let progressWin = null
+    // Updater: do a lightweight check at startup (no downloading). If an update
+    // is available, notify the user (notification + renderer event). Actual
+    // download/apply will be triggered from the Settings modal via IPC.
     try {
-        const { ipcMain } = require('electron')
         const updater = require(path.join(__dirname, 'updater'))
 
         // Determine the runtime dist directory (where the app currently serves from).
-        // This may be inside the mounted AppImage (read-only). If so, copy it to
-        // a writable location under app.getPath('userData') and use that for updates.
         const runtimeSourceDir = path.dirname(chosenDistIndex || embeddedDistIndex)
         let distDir = runtimeSourceDir
 
-        // Detect AppImage / mounted runtime on Linux
+        // Detect AppImage / mounted runtime on Linux and prefer a writable copy in userData
         const runningOnLinux = process.platform === 'linux'
         const runningAsAppImage = !!process.env.APPIMAGE || (process.resourcesPath && process.resourcesPath.includes('/.mount'))
         if (runningOnLinux && runningAsAppImage) {
             try {
                 const userDist = path.join(app.getPath('userData'), 'dist')
-                // If userDist doesn't exist, copy the runtimeSourceDir contents into it
                 if (runtimeSourceDir && fs.existsSync(runtimeSourceDir) && !fs.existsSync(userDist)) {
-                    console.log('[updater] packaging: copying runtime dist to userData:', runtimeSourceDir, '->', userDist)
-                    // ensure parent exists
                     fs.mkdirSync(userDist, { recursive: true })
-                    // Use fs.cpSync when available (Node 16+). Fallback to manual copy.
-                    if (typeof fs.cpSync === 'function') {
-                        fs.cpSync(runtimeSourceDir, userDist, { recursive: true })
-                    } else {
-                        // simple recursive copy
+                    if (typeof fs.cpSync === 'function') fs.cpSync(runtimeSourceDir, userDist, { recursive: true })
+                    else {
                         const copyRecursiveSync = (src, dest) => {
                             const entries = fs.readdirSync(src, { withFileTypes: true })
                             for (const entry of entries) {
@@ -332,69 +324,95 @@ async function createWindow() {
                                 if (entry.isDirectory()) {
                                     if (!fs.existsSync(destPath)) fs.mkdirSync(destPath)
                                     copyRecursiveSync(srcPath, destPath)
-                                } else {
-                                    fs.copyFileSync(srcPath, destPath)
-                                }
+                                } else fs.copyFileSync(srcPath, destPath)
                             }
                         }
                         copyRecursiveSync(runtimeSourceDir, userDist)
                     }
                     distDir = userDist
-                } else if (fs.existsSync(userDist)) {
-                    // already present, prefer it
-                    distDir = userDist
-                }
-            } catch (e) {
-                console.warn('[updater] failed to copy runtime dist to userData, falling back to runtime source dir:', e && e.message)
-                distDir = runtimeSourceDir
-            }
-            // record resolved dir for use by the server below
+                } else if (fs.existsSync(userDist)) distDir = userDist
+            } catch (e) { console.warn('[updater] failed to prepare writable dist copy:', e && e.message); distDir = runtimeSourceDir }
             resolvedDistDir = distDir
         }
 
-        // create a small progress window
-        progressWin = new BrowserWindow({
-            width: 420,
-            height: 200,
-            frame: false,
-            resizable: false,
-            show: false,
-            webPreferences: {
-                preload: path.join(__dirname, 'preload-updater.js'),
-                contextIsolation: true,
-                nodeIntegration: false
+        // perform a lightweight check (no downloads)
+        try {
+            const check = await updater.checkForUpdate({ distDir, remoteBaseUrl: 'https://nintendo-switch-content-ee8d316db220.herokuapp.com' })
+            if (check && check.available) {
+                try { new Notification({ title: 'Content update available', body: `New content ${check.remoteVer}` }).show() } catch (e) { }
+                try { if (win && !win.isDestroyed()) win.webContents.send('update-available', check) } catch (e) { }
+            }
+        } catch (e) {
+            console.warn('[updater] check failed:', e && e.message)
+        }
+
+        // Expose IPC handlers so renderer can ask for checks and trigger the full updater.
+        ipcMain.handle('updater:check', async () => {
+            try { return await updater.checkForUpdate({ distDir, remoteBaseUrl: 'https://nintendo-switch-content-ee8d316db220.herokuapp.com' }) }
+            catch (e) { return { error: String(e) } }
+        })
+
+        ipcMain.handle('updater:run', async () => {
+            // create a small progress window (same UI as before)
+            let progressWin = null
+            try {
+                progressWin = new BrowserWindow({
+                    width: 420,
+                    height: 200,
+                    frame: false,
+                    resizable: false,
+                    show: false,
+                    webPreferences: {
+                        preload: path.join(__dirname, 'preload-updater.js'),
+                        contextIsolation: true,
+                        nodeIntegration: false
+                    }
+                })
+                progressWin.loadFile(path.join(__dirname, 'updater-ui.html'))
+                await new Promise((resolve) => progressWin.webContents.once('did-finish-load', resolve))
+                progressWin.show()
+
+                const onProgress = (p) => {
+                    try { if (progressWin && !progressWin.isDestroyed()) progressWin.webContents.send('updater-progress', p) } catch (e) { }
+                    try { if (win && !win.isDestroyed()) win.webContents.send('updater-progress', p) } catch (e) { }
+                }
+                const onStatus = (s) => {
+                    try { if (progressWin && !progressWin.isDestroyed()) progressWin.webContents.send('updater-status', s) } catch (e) { }
+                    try { if (win && !win.isDestroyed()) win.webContents.send('updater-status', s) } catch (e) { }
+                }
+
+                onStatus('Starting update...')
+                const res = await updater.runUpdater({ distDir, remoteBaseUrl: 'https://nintendo-switch-content-ee8d316db220.herokuapp.com', onProgress })
+                onStatus(res && res.updated ? 'Update applied' : 'No update')
+
+                // If an update was applied, reload the main window so it fetches the
+                // new files from the local HTTP server. Also notify the renderer
+                // with a dedicated event so UI can react (show toast, close modal, etc.).
+                try {
+                    if (res && res.updated) {
+                        try {
+                            if (win && !win.isDestroyed()) {
+                                // force reload ignoring cache so the renderer fetches fresh assets
+                                win.webContents.reloadIgnoringCache()
+                                // inform renderer that update completed
+                                win.webContents.send('update-complete', res)
+                            }
+                        } catch (e) { /* ignore reload errors */ }
+                    } else {
+                        try { if (win && !win.isDestroyed()) win.webContents.send('update-complete', res) } catch (e) { }
+                    }
+                } catch (e) { }
+
+                return res
+            } catch (e) {
+                try { if (progressWin && !progressWin.isDestroyed()) progressWin.webContents.send('updater-status', 'Update failed: ' + (e && e.message)) } catch (e) { }
+                throw e
+            } finally {
+                setTimeout(() => { try { if (progressWin && !progressWin.isDestroyed()) progressWin.close() } catch (e) { } }, 900)
             }
         })
-        progressWin.loadFile(path.join(__dirname, 'updater-ui.html'))
-        // wait for renderer to finish loading so it can receive IPC messages
-        await new Promise((resolve) => progressWin.webContents.once('did-finish-load', resolve))
-        progressWin.show()
-
-        // forward progress from updater to UI via IPC
-        const onProgress = (p) => {
-            try { if (progressWin && !progressWin.isDestroyed()) progressWin.webContents.send('updater-progress', p) } catch (e) { }
-        }
-        const onStatus = (s) => {
-            try { if (progressWin && !progressWin.isDestroyed()) progressWin.webContents.send('updater-status', s) } catch (e) { }
-        }
-
-        try {
-            // notify UI we're starting
-            onStatus('Starting update...')
-            const res = await updater.runUpdater({ distDir, remoteBaseUrl: 'https://nintendo-switch-content-ee8d316db220.herokuapp.com', onProgress })
-            if (res && res.updated) console.log('Updater applied: ', res)
-            else console.log('Updater: no update required', res)
-            onStatus('Update complete')
-        } catch (e) {
-            console.warn('Updater failed (continuing):', e && e.message)
-            onStatus('Update failed: ' + (e && e.message))
-        } finally {
-            // close progress window after short delay so user can see the final status
-            setTimeout(() => { try { if (progressWin && !progressWin.isDestroyed()) progressWin.close() } catch (e) { } }, 900)
-        }
     } catch (e) {
-        console.warn('Updater module or UI not available:', e && e.message)
-        try { if (progressWin && !progressWin.isDestroyed()) progressWin.close() } catch (e) { }
+        console.warn('Updater module not available:', e && e.message)
     }
 
     if (chosenDistIndex) {

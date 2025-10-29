@@ -324,4 +324,29 @@ async function runUpdater(options) {
     return { updated: true, localVer, remoteVer }
 }
 
-module.exports = { runUpdater }
+// Check-only function: fetch remote content.json and compare versions with local.
+// Returns { available: boolean, localVer, remoteVer }
+async function checkForUpdate(options) {
+    const distDir = options.distDir
+    const remoteBaseUrl = options.remoteBaseUrl || 'http://127.0.0.1:5173'
+    const localContentPath = path.join(distDir, 'content.json')
+
+    let local = null
+    if (fs.existsSync(localContentPath)) {
+        try { local = JSON.parse(fs.readFileSync(localContentPath, 'utf8')) } catch (e) { local = null }
+    }
+
+    let remoteRaw
+    try { remoteRaw = await fetchText(remoteBaseUrl + '/content.json', 8000) } catch (e) {
+        throw new Error('Failed to fetch remote content.json: ' + e.message)
+    }
+    let remote
+    try { remote = JSON.parse(remoteRaw) } catch (e) { throw new Error('Remote content.json parse error: ' + e.message) }
+
+    const localVer = local && local.version ? local.version : null
+    const remoteVer = remote && remote.version ? remote.version : null
+    const available = Boolean(remoteVer && (!localVer || remoteVer !== localVer))
+    return { available, localVer, remoteVer }
+}
+
+module.exports = { runUpdater, checkForUpdate }

@@ -40,3 +40,20 @@ contextBridge.exposeInMainWorld('electronWifi', {
     list: () => ipcRenderer.invoke('wifi:list'),
     status: (ssid) => ipcRenderer.invoke('wifi:status', ssid)
 });
+
+// Updater bridge: check for update and trigger update run. Also allow
+// subscribing to progress/status events emitted by main during update.
+contextBridge.exposeInMainWorld('electronUpdater', {
+    check: (opts = {}) => ipcRenderer.invoke('updater:check', opts),
+    run: (opts = {}) => ipcRenderer.invoke('updater:run', opts),
+    onProgress: (cb) => {
+        const listener = (_, p) => cb(p)
+        ipcRenderer.on('updater-progress', listener)
+        return () => ipcRenderer.removeListener('updater-progress', listener)
+    },
+    onStatus: (cb) => {
+        const listener = (_, s) => cb(s)
+        ipcRenderer.on('updater-status', listener)
+        return () => ipcRenderer.removeListener('updater-status', listener)
+    }
+});
