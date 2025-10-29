@@ -29,62 +29,13 @@ autoUpdater.on("download-progress", (progress) => {
     log.info(`Progress: ${Math.round(progress.percent)}%`);
 });
 
-autoUpdater.on("update-downloaded", (info) => {
+autoUpdater.on("update-downloaded", async (info) => {
     log.info("Update downloaded, will install on quit");
     try {
         // If running on Linux try to create a stable symlink to the new AppImage
         // so the systemd service can reference a predictable filename.
         if (process.platform === 'linux') {
-            try {
-                const execDir = path.dirname(process.execPath || process.resourcesPath || __dirname)
-                log.info('[updater] attempting to locate new AppImage to create stable symlink')
-                // Candidate directories to scan for the newly downloaded AppImage
-                const candidateDirs = [
-                    execDir,
-                    process.resourcesPath || execDir,
-                    path.join(os.homedir(), 'Applications'),
-                    app.getPath && app.getPath('userData') || execDir,
-                    '/tmp'
-                ]
-
-                function findNewestAppImage(dirs) {
-                    const re = /^Gamepad-App-.*\.AppImage$/
-                    let best = null
-                    for (const d of dirs) {
-                        try {
-                            if (!d || !fs.existsSync(d)) continue
-                            const names = fs.readdirSync(d)
-                            for (const n of names) {
-                                if (!re.test(n)) continue
-                                const full = path.join(d, n)
-                                try {
-                                    const st = fs.statSync(full)
-                                    if (!best || st.mtimeMs > best.mtimeMs) best = { path: full, mtimeMs: st.mtimeMs }
-                                } catch (e) { }
-                            }
-                        } catch (e) { }
-                    }
-                    return best && best.path
-                }
-
-                const found = findNewestAppImage(candidateDirs)
-                if (found) {
-                    try {
-                        const targetDir = path.join(os.homedir(), 'Applications')
-                        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true })
-                        const linkPath = path.join(targetDir, 'Gamepad-App.AppImage')
-                        try { if (fs.existsSync(linkPath) || fs.lstatSync(linkPath).isSymbolicLink()) fs.unlinkSync(linkPath) } catch (e) { }
-                        fs.symlinkSync(found, linkPath)
-                        log.info('[updater] symlink created:', linkPath, '->', found)
-                    } catch (e) {
-                        log.warn('[updater] symlink create failed:', e && e.message)
-                    }
-                } else {
-                    log.warn('[updater] could not find a downloaded Gamepad-App-*.AppImage in candidate dirs:', candidateDirs)
-                }
-            } catch (e) {
-                log.warn('[updater] failed to create symlink:', e && e.message)
-            }
+            try { await tryCreateAppImageSymlink() } catch (e) { log.warn('[updater] failed to create symlink:', e && e.message) }
         }
     } catch (e) {
         log.warn('[updater] post-download hook error:', e && e.message)
@@ -228,6 +179,63 @@ function fetchJson(url, timeout = 5000) {
         req.on('error', reject)
         req.setTimeout(timeout, () => { req.abort(); reject(new Error('Timeout')) })
     })
+}
+
+// Try to create a stable symlink to the most-recently downloaded AppImage.
+// This centralizes the logic so we can call it at startup.
+async function tryCreateAppImageSymlink() {
+    try {
+        if (process.platform !== 'linux') return
+        const execDir = path.dirname(process.execPath || process.resourcesPath || __dirname)
+        log.info('[updater] attempting to locate new AppImage to create stable symlink (startup)')
+        const candidateDirs = [
+            execDir,
+            process.resourcesPath || execDir,
+            path.join(os.homedir(), 'Applications'),
+            (app.getPath && app.getPath('userData')) || execDir,
+            os.tmpdir(),
+            '/tmp',
+            '/var/tmp'
+        ]
+
+        function findNewestAppImage(dirs) {
+            const re = /^Gamepad-App-.*\.AppImage$/
+            let best = null
+            for (const d of dirs) {
+                try {
+                    if (!d || !fs.existsSync(d)) continue
+                    const names = fs.readdirSync(d)
+                    for (const n of names) {
+                        if (!re.test(n)) continue
+                        const full = path.join(d, n)
+                        try {
+                            const st = fs.statSync(full)
+                            if (!best || st.mtimeMs > best.mtimeMs) best = { path: full, mtimeMs: st.mtimeMs }
+                        } catch (e) { }
+                    }
+                } catch (e) { }
+            }
+            return best && best.path
+        }
+
+        const found = findNewestAppImage(candidateDirs)
+        if (found) {
+            try {
+                const targetDir = path.join(os.homedir(), 'Applications')
+                if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true })
+                const linkPath = path.join(targetDir, 'Gamepad-App.AppImage')
+                try { if (fs.existsSync(linkPath) || (fs.lstatSync && fs.lstatSync(linkPath).isSymbolicLink())) fs.unlinkSync(linkPath) } catch (e) { }
+                fs.symlinkSync(found, linkPath)
+                log.info('[updater] symlink created:', linkPath, '->', found)
+            } catch (e) {
+                log.warn('[updater] symlink create failed:', e && e.message)
+            }
+        } else {
+            log.warn('[updater] could not find a downloaded Gamepad-App-*.AppImage in candidate dirs:', candidateDirs)
+        }
+    } catch (e) {
+        log.warn('[updater] tryCreateAppImageSymlink failed:', e && e.message)
+    }
 }
 
 async function createWindow() {
@@ -533,7 +541,12 @@ async function createWindow() {
     }
 }
 
-app.whenReady().then(() => createWindow())
+app.whenReady().then(async () => {
+    // Attempt to create the stable AppImage symlink at startup so systemd or
+    // other system integrations can reference a predictable filename.
+    try { await tryCreateAppImageSymlink() } catch (e) { /* ignore */ }
+    createWindow()
+})
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
