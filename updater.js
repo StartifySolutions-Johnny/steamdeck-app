@@ -61,8 +61,12 @@ function inferFilesFromManifest(manifest, baseUrl) {
         return (new URL(p, baseUrl)).toString()
     }
 
-    if (manifest && Array.isArray(manifest.books)) {
-        for (const b of manifest.books) {
+    // Accept either a top-level `books` array (legacy) or `collections` where
+    // each collection contains a `books` array. This keeps the updater
+    // compatible while the new content model rolls out.
+    if (manifest) {
+        const handleBook = (b) => {
+            if (!b) return
             const coverUrl = resolveAsset(b.cover, b)
             if (coverUrl) files.add(coverUrl)
             if (Array.isArray(b.content)) {
@@ -71,6 +75,19 @@ function inferFilesFromManifest(manifest, baseUrl) {
                         const u = resolveAsset(it.src, b)
                         if (u) files.add(u)
                     }
+                }
+            }
+        }
+
+        if (Array.isArray(manifest.books)) {
+            for (const b of manifest.books) handleBook(b)
+        }
+
+        if (Array.isArray(manifest.collections)) {
+            for (const col of manifest.collections) {
+                if (!col) continue
+                if (Array.isArray(col.books)) {
+                    for (const b of col.books) handleBook(b)
                 }
             }
         }
@@ -169,7 +186,19 @@ async function runUpdater(options) {
 
     let remote
     try { remote = JSON.parse(remoteRaw) } catch (e) { throw new Error('Remote content.json parse error: ' + e.message) }
-    console.log(remote.books.length);
+    // Support both legacy `books` and new `collections` structures. Log a brief
+    // diagnostic about what we found so update traces are clearer.
+    try {
+        if (Array.isArray(remote.books)) {
+            console.log('[updater] remote manifest books:', remote.books.length)
+        } else if (Array.isArray(remote.collections)) {
+            let totalBooks = 0
+            for (const c of remote.collections) if (c && Array.isArray(c.books)) totalBooks += c.books.length
+            console.log('[updater] remote manifest collections:', remote.collections.length, 'total books:', totalBooks)
+        } else {
+            console.log('[updater] remote manifest has no books or collections')
+        }
+    } catch (e) { console.log('[updater] manifest inspection failed:', e && e.message) }
 
     const localVer = local && local.version ? local.version : null
     const remoteVer = remote && remote.version ? remote.version : null
