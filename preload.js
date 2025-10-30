@@ -41,6 +41,13 @@ contextBridge.exposeInMainWorld('electronWifi', {
     status: (ssid) => ipcRenderer.invoke('wifi:status', ssid)
 });
 
+// Brightness bridge using system brightnessctl (Linux). Exposes get() -> {ok, supported, value}
+// and set(percent) -> {ok, supported}.
+contextBridge.exposeInMainWorld('electronBrightness', {
+    get: () => ipcRenderer.invoke('brightness:get'),
+    set: (percent) => ipcRenderer.invoke('brightness:set', percent)
+});
+
 // Updater bridge: check for update and trigger update run. Also allow
 // subscribing to progress/status events emitted by main during update.
 contextBridge.exposeInMainWorld('electronUpdater', {
