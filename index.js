@@ -545,6 +545,18 @@ app.whenReady().then(async () => {
     // Attempt to create the stable AppImage symlink at startup so systemd or
     // other system integrations can reference a predictable filename.
     try { await tryCreateAppImageSymlink() } catch (e) { /* ignore */ }
+    // On Linux, try to set brightness to max on startup so the display is
+    // usable immediately (uses brightnessctl if available).
+    try {
+        if (process.platform === 'linux') {
+            try {
+                await execPromise('brightnessctl set 100%')
+                try { log.info('[startup] brightness set to 100%') } catch (e) { }
+            } catch (e) {
+                try { log.warn('[startup] brightness set failed:', e && e.message) } catch (ee) { }
+            }
+        }
+    } catch (e) { /* ignore */ }
     createWindow()
 })
 
@@ -656,32 +668,23 @@ ipcMain.handle('autostart:set', async (_, enabled) => {
 // IPC: perform a system power action using sudo. Expects 'poweroff' or 'reboot'.
 // WARNING: this will write the provided password to the stdin of sudo. That is
 // potentially insecure. The UI currently sends the password 'butterfly'.
-ipcMain.handle('system:power', async (_, action, password) => {
+ipcMain.handle('system:power', async (_, action) => {
     try {
         if (process.platform !== 'linux') return { ok: false, supported: false, error: 'Unsupported platform' }
         if (!['poweroff', 'reboot'].includes(action)) return { ok: false, error: 'Invalid action' }
 
-        // Basic password check - caller asked to use 'butterfly'. We still allow any
-        // password to be passed, but you can enforce matching here if desired.
-        // if (password !== 'butterfly') return { ok: false, error: 'Incorrect password' }
-
-        // Use sudo -S to read password from stdin and -p '' to suppress prompt text
-        const cmd = 'sudo'
-        const args = ['-S', '-p', '', action]
-        const spawned = spawn(cmd, args, { stdio: ['pipe', 'pipe', 'pipe'] })
-
-        let stdout = ''
-        let stderr = ''
-        spawned.stdout.on('data', (d) => { stdout += String(d || '') })
-        spawned.stderr.on('data', (d) => { stderr += String(d || '') })
-
-        // write password + newline
-        spawned.stdin.write(String(password || '') + '\n')
-        spawned.stdin.end()
-
-        const exit = await new Promise((resolve) => spawned.on('exit', resolve))
-        if (exit === 0) return { ok: true, supported: true, stdout, stderr }
-        return { ok: false, supported: true, exitCode: exit, stdout, stderr }
+        // Execute the system action directly without sudo. The caller should
+        // ensure the environment has appropriate privileges (e.g. systemd
+        // service or polkit rules). We intentionally do not prompt for sudo
+        // here — caller previously passed a password which is now ignored.
+        const cmd = action === 'poweroff' ? 'systemctl poweroff' : 'systemctl reboot'
+        try {
+            const out = await execPromise(cmd)
+            return { ok: true, supported: true, stdout: out.stdout }
+        } catch (e) {
+            // execPromise rejects on non-zero exit; surface stderr where present
+            return { ok: false, supported: true, error: String(e), stderr: e.stderr || null }
+        }
     } catch (e) {
         return { ok: false, error: String(e) }
     }
