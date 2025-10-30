@@ -545,6 +545,18 @@ app.whenReady().then(async () => {
     // Attempt to create the stable AppImage symlink at startup so systemd or
     // other system integrations can reference a predictable filename.
     try { await tryCreateAppImageSymlink() } catch (e) { /* ignore */ }
+    // On Linux, try to set brightness to max on startup so the display is
+    // usable immediately (uses brightnessctl if available).
+    try {
+        if (process.platform === 'linux') {
+            try {
+                await execPromise('brightnessctl set 100%')
+                try { log.info('[startup] brightness set to 100%') } catch (e) { }
+            } catch (e) {
+                try { log.warn('[startup] brightness set failed:', e && e.message) } catch (ee) { }
+            }
+        }
+    } catch (e) { /* ignore */ }
     createWindow()
 })
 
