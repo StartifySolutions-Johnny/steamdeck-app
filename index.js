@@ -2,7 +2,6 @@ const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
-const say = require('say');
 const { spawn, exec } = require('child_process')
 const os = require('os')
 const { autoUpdater } = require("electron-updater");
@@ -89,47 +88,23 @@ function spawnTtsFallback(text, lang = 'en-US') {
     }
 }
 
-// IPC: speak text (primary: say.speak; fallback: spd-say/espeak)
-// Accepts (text, opts) where opts may include { lang, voice }
+// IPC: speak text — always use the local fallback (spd-say / espeak) via spawnTtsFallback
+// Accepts (text, opts) where opts may include { lang }
 ipcMain.handle('tts:speak', async (_, text, opts = {}) => {
     try {
-        // prefer the `say` module which abstracts platform differences
-        const lang = opts.lang || 'en-US'
-        const voice = opts.voice
-        try {
-            // say.speak(text, voice, speed, callback)
-            say.speak(text, voice, 1.0, (err) => {
-                if (err) {
-                    // If say failed at runtime, attempt fallback on Linux with language
-                    if (process.platform === 'linux') spawnTtsFallback(text, lang)
-                }
-            })
-            return { ok: true }
-        } catch (err) {
-            // synchronous failure from say -> try fallback
-            if (process.platform === 'linux') {
-                const spawned = spawnTtsFallback(text, lang)
-                return { ok: !!spawned }
-            }
-            return { ok: false, error: String(err) }
-        }
+        const lang = (opts && opts.lang) || 'en-US'
+        // Kill any existing TTS process first
+        try { if (currentTtsProcess) { try { currentTtsProcess.kill() } catch (e) { } currentTtsProcess = null } } catch (e) { }
+        const spawned = spawnTtsFallback(text, lang)
+        return { ok: !!spawned }
     } catch (e) {
-        // last-resort attempt on Linux
-        if (process.platform === 'linux') {
-            const lang = (opts && opts.lang) || 'en-US'
-            const spawned = spawnTtsFallback(text, lang)
-            return { ok: !!spawned }
-        }
         return { ok: false, error: String(e) }
     }
 })
 
-// IPC: stop any current TTS (try say.stop(), then kill spawned process)
+// IPC: stop any current TTS (kill spawned process)
 ipcMain.handle('tts:stop', async () => {
     try {
-        if (typeof say.stop === 'function') {
-            try { say.stop() } catch (e) { /* ignore */ }
-        }
         if (currentTtsProcess) {
             try { currentTtsProcess.kill() } catch (e) { /* ignore */ }
             currentTtsProcess = null
@@ -143,8 +118,6 @@ ipcMain.handle('tts:stop', async () => {
 // IPC: isAvailable => quick heuristic to detect at least one available TTS path
 ipcMain.handle('tts:isAvailable', async () => {
     try {
-        // If the `say` module is present, assume OK (it will attempt system binaries)
-        if (say && typeof say.speak === 'function') return { ok: true }
         // On Linux check common paths for spd-say / espeak
         if (process.platform === 'linux') {
             const candidates = ['/usr/bin/spd-say', '/bin/spd-say', '/usr/bin/espeak', '/bin/espeak']
