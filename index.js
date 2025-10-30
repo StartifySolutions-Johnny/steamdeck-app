@@ -566,6 +566,49 @@ function execPromise(cmd, opts = {}) {
     })
 }
 
+// Brightness control handlers. Uses the `brightnessctl` CLI on Linux. We
+// expose get/set via IPC so the renderer can control screen brightness.
+ipcMain.handle('brightness:get', async () => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        // Try to read current and max values to compute percent if possible
+        let cur = null
+        let max = null
+        try {
+            const r1 = await execPromise('brightnessctl get')
+            cur = parseInt(String(r1.stdout || '').trim(), 10)
+        } catch (e) { cur = null }
+        try {
+            const r2 = await execPromise('brightnessctl max')
+            max = parseInt(String(r2.stdout || '').trim(), 10)
+        } catch (e) { max = null }
+        if (cur === null) {
+            // Try alternative short commands
+            try { const r = await execPromise('brightnessctl g'); cur = parseInt(String(r.stdout || '').trim(), 10) } catch (e) { }
+            try { const r = await execPromise('brightnessctl m'); if (!max) max = parseInt(String(r.stdout || '').trim(), 10) } catch (e) { }
+        }
+        if (cur === null) return { ok: false, supported: true, error: 'could not read current brightness' }
+        let percent = null
+        if (max && max > 0) percent = Math.round((cur / max) * 100)
+        return { ok: true, supported: true, value: percent !== null ? percent : cur, raw: { cur, max } }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
+ipcMain.handle('brightness:set', async (_, percent) => {
+    try {
+        if (process.platform !== 'linux') return { ok: false, supported: false }
+        if (typeof percent !== 'number') return { ok: false, error: 'percent must be a number' }
+        const clamped = Math.max(0, Math.min(100, Math.round(percent)))
+        // brightnessctl accepts percentage arguments like '50%'
+        await execPromise(`brightnessctl set ${clamped}%`)
+        return { ok: true, supported: true, value: clamped }
+    } catch (e) {
+        return { ok: false, error: String(e) }
+    }
+})
+
 // IPC: autostart status / control for systemd --user service (Linux only)
 ipcMain.handle('autostart:status', async () => {
     try {
