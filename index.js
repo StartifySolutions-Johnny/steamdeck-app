@@ -80,13 +80,13 @@ function spawnTtsFallback(text, opts = {}) {
         // Prefer spd-say (often available via speech-dispatcher). It will use
         // system configured voices which are typically higher quality than
         // espeak. We pass -l for locale if supported and fall back to plain.
-        const spdArgs = []
-        try {
-            // include language flag if present
-            if (lang) spdArgs.push('-l', lang)
-            spdArgs.push(text)
-            if (trySpawn('spd-say', spdArgs)) return true
-        } catch (e) { /* fallthrough */ }
+        // const spdArgs = []
+        // try {
+        //     // include language flag if present
+        //     if (lang) spdArgs.push('-l', lang)
+        //     spdArgs.push(text)
+        //     if (trySpawn('spd-say', spdArgs)) return true
+        // } catch (e) { /* fallthrough */ }
 
         // If spd-say not available or failed, prefer espeak-ng if present
         // Build espeak/espeak-ng args with voice/rate/pitch/amplitude
