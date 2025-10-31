@@ -55,36 +55,53 @@ let currentTtsProcess = null
  * Tries `spd-say` first, then `espeak`.
  * Returns true if a process was spawned, false otherwise.
  */
-function spawnTtsFallback(text, lang = 'en-US') {
+function spawnTtsFallback(text, opts = {}) {
+    // opts may include: { lang: 'en-US', voice: 'en-us+f3', rate: 150, pitch: 50, amplitude: 100 }
+    const { lang = 'en-US', voice = null, rate = 150, pitch = 50, amplitude = 100 } = opts || {}
     if (currentTtsProcess) {
         try { currentTtsProcess.kill() } catch (e) { }
         currentTtsProcess = null
     }
-    try {
-        // Prefer spd-say (often available via speech-dispatcher)
-        // Pass language flag where supported (-l)
-        currentTtsProcess = spawn('spd-say', ['-l', lang, text])
-        currentTtsProcess.on('exit', () => { currentTtsProcess = null })
-        currentTtsProcess.on('error', () => {
-            // fall through to try espeak
-            try {
-                // espeak accepts -v <voice/lang>
-                currentTtsProcess = spawn('espeak', ['-v', lang, text])
-                currentTtsProcess.on('exit', () => { currentTtsProcess = null })
-            } catch (e) {
-                currentTtsProcess = null
-            }
-        })
-        return true
-    } catch (e) {
+
+    // Helper to try spawning a command with args, returns true on spawn
+    const trySpawn = (cmd, args) => {
         try {
-            currentTtsProcess = spawn('espeak', ['-v', lang, text])
+            currentTtsProcess = spawn(cmd, args)
             currentTtsProcess.on('exit', () => { currentTtsProcess = null })
+            currentTtsProcess.on('error', () => { currentTtsProcess = null })
             return true
-        } catch (ee) {
+        } catch (e) {
             currentTtsProcess = null
             return false
         }
+    }
+
+    try {
+        // Prefer spd-say (often available via speech-dispatcher). It will use
+        // system configured voices which are typically higher quality than
+        // espeak. We pass -l for locale if supported and fall back to plain.
+        const spdArgs = []
+        try {
+            // include language flag if present
+            if (lang) spdArgs.push('-l', lang)
+            spdArgs.push(text)
+            if (trySpawn('spd-say', spdArgs)) return true
+        } catch (e) { /* fallthrough */ }
+
+        // If spd-say not available or failed, prefer espeak-ng if present
+        // Build espeak/espeak-ng args with voice/rate/pitch/amplitude
+        // espeak/espeak-ng options: -v <voice>, -s <speed words/min>, -p <pitch 0-99>, -a <amplitude 0-200>
+        const espeakVoice = voice || (lang ? String(lang).toLowerCase().replace('_', '-') : 'en')
+        const espeakArgs = ['-v', espeakVoice, '-s', String(rate), '-p', String(pitch), '-a', String(amplitude), text]
+        if (trySpawn('espeak-ng', espeakArgs)) return true
+        if (trySpawn('espeak', espeakArgs)) return true
+
+        // Last resort: try a very simple espeak call with only voice/lang
+        if (trySpawn('espeak', ['-v', espeakVoice, text])) return true
+        return false
+    } catch (e) {
+        currentTtsProcess = null
+        return false
     }
 }
 
@@ -92,10 +109,10 @@ function spawnTtsFallback(text, lang = 'en-US') {
 // Accepts (text, opts) where opts may include { lang }
 ipcMain.handle('tts:speak', async (_, text, opts = {}) => {
     try {
-        const lang = (opts && opts.lang) || 'en-US'
+        const safeOpts = opts && typeof opts === 'object' ? opts : { lang: opts }
         // Kill any existing TTS process first
         try { if (currentTtsProcess) { try { currentTtsProcess.kill() } catch (e) { } currentTtsProcess = null } } catch (e) { }
-        const spawned = spawnTtsFallback(text, lang)
+        const spawned = spawnTtsFallback(text, safeOpts)
         return { ok: !!spawned }
     } catch (e) {
         return { ok: false, error: String(e) }
@@ -118,9 +135,14 @@ ipcMain.handle('tts:stop', async () => {
 // IPC: isAvailable => quick heuristic to detect at least one available TTS path
 ipcMain.handle('tts:isAvailable', async () => {
     try {
-        // On Linux check common paths for spd-say / espeak
+        // On Linux check common paths for spd-say / espeak / espeak-ng / pico2wave
         if (process.platform === 'linux') {
-            const candidates = ['/usr/bin/spd-say', '/bin/spd-say', '/usr/bin/espeak', '/bin/espeak']
+            const candidates = [
+                '/usr/bin/spd-say', '/bin/spd-say',
+                '/usr/bin/espeak-ng', '/bin/espeak-ng',
+                '/usr/bin/espeak', '/bin/espeak',
+                '/usr/bin/pico2wave', '/bin/pico2wave'
+            ]
             for (const p of candidates) {
                 try { if (fs.existsSync(p)) return { ok: true } } catch (e) { }
             }
