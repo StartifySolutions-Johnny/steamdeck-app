@@ -210,14 +210,22 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
             ensureDir(path.dirname(outPath))
             await new Promise((resolve) => {
                 let settled = false
+                let to = null
+                let cp2 = null
                 try {
                     // create args including the text
                     const textArgs = ['--text', text, '--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', outPath]
                     try {
-                        const cp2 = spawn('tts', textArgs, { stdio: ['ignore', 'ignore', 'pipe'] })
-                        cp2.stderr && cp2.stderr.on('data', (d) => { console.warn('[updater][tts] ' + String(d)) })
+                        // Log a short preview and length so we can debug spawn issues
+                        const preview = String(text).replace(/\n/g, '\\n').slice(0, 200)
+                        console.log(`[updater] spawning tts for book ${book.id} (text_len=${String(text).length}) preview="${preview}"`)
+                        // capture both stdout and stderr so we can see what the CLI prints
+                        cp2 = spawn('tts', textArgs, { stdio: ['ignore', 'pipe', 'pipe'] })
+                        cp2.stdout && cp2.stdout.on('data', (d) => { console.log(`[updater][tts stdout ${book.id}] ${String(d)}`) })
+                        cp2.stderr && cp2.stderr.on('data', (d) => { console.warn(`[updater][tts stderr ${book.id}] ${String(d)}`) })
                         cp2.on('error', (err) => {
                             console.warn('[updater] TTS spawn error for book', book.id, err && err.message)
+                            if (!settled) { settled = true; if (to) clearTimeout(to); resolve() }
                         })
                         cp2.on('close', (code) => {
                             if (code !== 0) console.warn('[updater] TTS exited with code', code, 'for book', book.id)
@@ -229,15 +237,17 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
                                     console.warn('[updater] TTS produced no output file for book', book.id, outPath)
                                 }
                             } catch (e) { }
+                            if (!settled) { settled = true; if (to) clearTimeout(to); resolve() }
                         })
                     } catch (e) {
                         console.warn('[updater] failed to spawn tts with --text for book', book.id, e && e.message)
+                        if (!settled) { settled = true; resolve() }
                     }
 
                     // safety timeout (120s)
-                    const to = setTimeout(() => {
+                    to = setTimeout(() => {
                         if (!settled) {
-                            try { cp.kill() } catch (e) { }
+                            try { if (cp2 && typeof cp2.kill === 'function') cp2.kill() } catch (e) { }
                             console.warn('[updater] TTS timeout for book', book.id)
                             settled = true
                             try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
@@ -248,7 +258,7 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
                 } catch (e) {
                     console.warn('[updater] TTS error for book', book.id, e && e.message)
                     try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
-                    if (!settled) { settled = true; resolve() }
+                    if (!settled) { settled = true; if (to) clearTimeout(to); resolve() }
                 }
             })
         } catch (e) {
