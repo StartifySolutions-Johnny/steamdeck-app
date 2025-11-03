@@ -154,11 +154,25 @@ function parseCssForAssets(cssText, baseUrl) {
 // This is best-effort: failures are logged but won't abort the overall update.
 async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
     if (!manifest) return 0
-    // collect books with paragraphs
+    // collect books that include paragraph text either in a `paragraphs` array
+    // or as `content` items of type 'paragraph'
     const books = []
     const collect = (b) => {
         if (!b) return
-        if (Array.isArray(b.paragraphs) && b.paragraphs.length > 0) books.push(b)
+        // prefer explicit paragraphs array
+        if (Array.isArray(b.paragraphs) && b.paragraphs.length > 0) {
+            books.push(b)
+            return
+        }
+        // otherwise inspect book.content for paragraph items
+        if (Array.isArray(b.content)) {
+            for (const it of b.content) {
+                if (it && it.type === 'paragraph' && typeof it.text === 'string' && it.text.trim() !== '') {
+                    books.push(b)
+                    return
+                }
+            }
+        }
     }
     if (Array.isArray(manifest.books)) manifest.books.forEach(collect)
     if (Array.isArray(manifest.collections)) {
@@ -175,8 +189,21 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
     const DOWNLOAD_MAX = 90
     for (let i = 0; i < total; i++) {
         const book = books[i]
-        // join paragraphs into a single text blob
-        const text = book.paragraphs.join('\n\n')
+        // collect paragraph texts: prefer book.paragraphs, else extract from content items
+        let paragraphs = []
+        if (Array.isArray(book.paragraphs) && book.paragraphs.length > 0) {
+            paragraphs = book.paragraphs.map(p => (typeof p === 'string' ? p : String(p)))
+        } else if (Array.isArray(book.content)) {
+            for (const it of book.content) {
+                if (it && it.type === 'paragraph' && typeof it.text === 'string') paragraphs.push(it.text)
+            }
+        }
+        if (!paragraphs || paragraphs.length === 0) {
+            // nothing to speak for this book
+            continue
+        }
+        // join paragraphs into a single text blob for the TTS input
+        const text = paragraphs.join('\n\n')
         const rel = `/books/${book.id}/tts.wav`
         const outPath = path.join(tmpRoot, rel.replace(/^\//, ''))
         try {
