@@ -208,21 +208,14 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
         const outPath = path.join(tmpRoot, rel.replace(/^\//, ''))
         try {
             ensureDir(path.dirname(outPath))
-            // spawn tts CLI and stream text via stdin; capture stdout into the WAV file
-            // Use --out_path - to write to stdout and pipe that into our outPath file.
-            const args = ['--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', rel]
+            // spawn tts CLI and stream text via stdin; instruct tts to write directly
+            // to the requested outPath (so CLI is called like: --out_path <outPath> and text is piped in)
+            const args = ['--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', outPath]
             await new Promise((resolve) => {
                 let settled = false
-                let fileStream = null
                 try {
-                    const cp = spawn('tts', args, { stdio: ['pipe', 'pipe', 'pipe'] })
-                    // pipe stdout into the destination file
-                    try {
-                        fileStream = fs.createWriteStream(outPath)
-                        cp.stdout.pipe(fileStream)
-                    } catch (e) {
-                        console.warn('[updater] failed to create write stream for', outPath, e && e.message)
-                    }
+                    // stdout is ignored because tts will write to the file directly
+                    const cp = spawn('tts', args, { stdio: ['pipe', 'ignore', 'pipe'] })
                     // log stderr for debugging
                     cp.stderr && cp.stderr.on('data', (d) => { console.warn('[updater][tts] ' + String(d)) })
 
@@ -230,19 +223,25 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
                         console.warn('[updater] TTS spawn error for book', book.id, err && err.message)
                         if (!settled) {
                             settled = true
-                            try { if (fileStream) fileStream.close() } catch (e) { }
                             try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
                             resolve()
                         }
                     })
 
                     cp.on('close', (code) => {
-                        // ensure the file stream is closed before resolving
-                        try { if (fileStream) fileStream.close() } catch (e) { }
                         if (code !== 0) {
                             console.warn('[updater] TTS exited with code', code, 'for book', book.id)
                             try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
                         }
+                        // basic check: if file exists but is zero length, warn
+                        try {
+                            if (fs.existsSync(outPath)) {
+                                const st = fs.statSync(outPath)
+                                if (!st || st.size === 0) console.warn('[updater] TTS produced empty file for book', book.id, outPath)
+                            } else {
+                                console.warn('[updater] TTS produced no output file for book', book.id, outPath)
+                            }
+                        } catch (e) { }
                         if (!settled) { settled = true; resolve() }
                     })
 
@@ -261,7 +260,6 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
                             try { cp.kill() } catch (e) { }
                             console.warn('[updater] TTS timeout for book', book.id)
                             settled = true
-                            try { if (fileStream) fileStream.close() } catch (e) { }
                             try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
                             resolve()
                         }
@@ -269,7 +267,6 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
 
                 } catch (e) {
                     console.warn('[updater] TTS error for book', book.id, e && e.message)
-                    try { if (fileStream) fileStream.close() } catch (e) { }
                     try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
                     if (!settled) { settled = true; resolve() }
                 }
