@@ -210,7 +210,7 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
             ensureDir(path.dirname(outPath))
             // spawn tts CLI and stream text via stdin; capture stdout into the WAV file
             // Use --out_path - to write to stdout and pipe that into our outPath file.
-            const args = ['--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', '-']
+            const args = ['--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', rel]
             await new Promise((resolve) => {
                 let settled = false
                 let fileStream = null
