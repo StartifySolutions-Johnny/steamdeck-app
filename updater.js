@@ -245,13 +245,33 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
                         if (!settled) { settled = true; resolve() }
                     })
 
-                    // write text to stdin and close it
+                    // pass text as --text argument (may be large; OS arg limits may apply)
+                    // build a new process with the text included in args instead of using stdin
+                    // NOTE: spawn was already created; kill and recreate with text in args
                     try {
-                        cp.stdin.write(text)
-                        cp.stdin.end()
+                        try { cp.kill() } catch (e) { }
+                    } catch (e) { }
+                    // create args including the text
+                    const textArgs = ['--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', outPath, '--text', text]
+                    try {
+                        const cp2 = spawn('tts', textArgs, { stdio: ['ignore', 'ignore', 'pipe'] })
+                        cp2.stderr && cp2.stderr.on('data', (d) => { console.warn('[updater][tts] ' + String(d)) })
+                        cp2.on('error', (err) => {
+                            console.warn('[updater] TTS spawn error for book', book.id, err && err.message)
+                        })
+                        cp2.on('close', (code) => {
+                            if (code !== 0) console.warn('[updater] TTS exited with code', code, 'for book', book.id)
+                            try {
+                                if (fs.existsSync(outPath)) {
+                                    const st = fs.statSync(outPath)
+                                    if (!st || st.size === 0) console.warn('[updater] TTS produced empty file for book', book.id, outPath)
+                                } else {
+                                    console.warn('[updater] TTS produced no output file for book', book.id, outPath)
+                                }
+                            } catch (e) { }
+                        })
                     } catch (e) {
-                        // if writing fails, make sure we clean up
-                        console.warn('[updater] failed to write to tts stdin for book', book.id, e && e.message)
+                        console.warn('[updater] failed to spawn tts with --text for book', book.id, e && e.message)
                     }
 
                     // safety timeout (120s)
