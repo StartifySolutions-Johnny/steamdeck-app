@@ -208,40 +208,70 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
         const outPath = path.join(tmpRoot, rel.replace(/^\//, ''))
         try {
             ensureDir(path.dirname(outPath))
-            // write a temporary text file and call tts with --text_file (safer for long/complex text)
-            const tempTextPath = outPath + '.txt'
-            try { fs.writeFileSync(tempTextPath, text, 'utf8') } catch (e) { console.warn('[updater] failed to write tts text file', tempTextPath, e && e.message) }
-            // spawn tts CLI. Use a timeout and make this best-effort.
-            const args = ['--text_file', tempTextPath, '--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', outPath]
+            // spawn tts CLI and stream text via stdin; capture stdout into the WAV file
+            // Use --out_path - to write to stdout and pipe that into our outPath file.
+            const args = ['--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', '-']
             await new Promise((resolve) => {
                 let settled = false
+                let fileStream = null
                 try {
-                    const cp = spawn('tts', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+                    const cp = spawn('tts', args, { stdio: ['pipe', 'pipe', 'pipe'] })
+                    // pipe stdout into the destination file
+                    try {
+                        fileStream = fs.createWriteStream(outPath)
+                        cp.stdout.pipe(fileStream)
+                    } catch (e) {
+                        console.warn('[updater] failed to create write stream for', outPath, e && e.message)
+                    }
                     // log stderr for debugging
                     cp.stderr && cp.stderr.on('data', (d) => { console.warn('[updater][tts] ' + String(d)) })
-                    cp.stdout && cp.stdout.on('data', (d) => { /* ignore or log if needed */ })
+
                     cp.on('error', (err) => {
                         console.warn('[updater] TTS spawn error for book', book.id, err && err.message)
-                        if (!settled) { settled = true; try { if (fs.existsSync(tempTextPath)) fs.unlinkSync(tempTextPath) } catch (e) { }; resolve() }
+                        if (!settled) {
+                            settled = true
+                            try { if (fileStream) fileStream.close() } catch (e) { }
+                            try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
+                            resolve()
+                        }
                     })
+
                     cp.on('close', (code) => {
-                        if (code !== 0) console.warn('[updater] TTS exited with code', code, 'for book', book.id)
-                        if (!settled) { settled = true; try { if (fs.existsSync(tempTextPath)) fs.unlinkSync(tempTextPath) } catch (e) { }; resolve() }
+                        // ensure the file stream is closed before resolving
+                        try { if (fileStream) fileStream.close() } catch (e) { }
+                        if (code !== 0) {
+                            console.warn('[updater] TTS exited with code', code, 'for book', book.id)
+                            try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
+                        }
+                        if (!settled) { settled = true; resolve() }
                     })
+
+                    // write text to stdin and close it
+                    try {
+                        cp.stdin.write(text)
+                        cp.stdin.end()
+                    } catch (e) {
+                        // if writing fails, make sure we clean up
+                        console.warn('[updater] failed to write to tts stdin for book', book.id, e && e.message)
+                    }
+
                     // safety timeout (120s)
-                    setTimeout(() => {
+                    const to = setTimeout(() => {
                         if (!settled) {
                             try { cp.kill() } catch (e) { }
                             console.warn('[updater] TTS timeout for book', book.id)
                             settled = true
-                            try { if (fs.existsSync(tempTextPath)) fs.unlinkSync(tempTextPath) } catch (e) { }
+                            try { if (fileStream) fileStream.close() } catch (e) { }
+                            try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
                             resolve()
                         }
                     }, 120000)
+
                 } catch (e) {
                     console.warn('[updater] TTS error for book', book.id, e && e.message)
-                    try { if (fs.existsSync(tempTextPath)) fs.unlinkSync(tempTextPath) } catch (e) { }
-                    resolve()
+                    try { if (fileStream) fileStream.close() } catch (e) { }
+                    try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
+                    if (!settled) { settled = true; resolve() }
                 }
             })
         } catch (e) {
