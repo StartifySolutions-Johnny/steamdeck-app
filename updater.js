@@ -212,7 +212,7 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
                 let settled = false
                 try {
                     // create args including the text
-                    const textArgs = ['--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', outPath, '--text', text]
+                    const textArgs = ['--text', text, '--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', outPath]
                     try {
                         const cp2 = spawn('tts', textArgs, { stdio: ['ignore', 'ignore', 'pipe'] })
                         cp2.stderr && cp2.stderr.on('data', (d) => { console.warn('[updater][tts] ' + String(d)) })
