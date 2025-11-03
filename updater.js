@@ -3,6 +3,7 @@ const path = require('path')
 const http = require('http')
 const https = require('https')
 const { URL } = require('url')
+const { spawn } = require('child_process')
 
 function fetchText(url, timeout = 10000) {
     return new Promise((resolve, reject) => {
@@ -148,6 +149,85 @@ function parseCssForAssets(cssText, baseUrl) {
     return Array.from(urls)
 }
 
+// Generate TTS WAV files for books that contain a `paragraphs` array.
+// Writes files into the temporary update folder (tmpRoot) under /books/{id}/tts.wav
+// This is best-effort: failures are logged but won't abort the overall update.
+async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
+    if (!manifest) return 0
+    // collect books with paragraphs
+    const books = []
+    const collect = (b) => {
+        if (!b) return
+        if (Array.isArray(b.paragraphs) && b.paragraphs.length > 0) books.push(b)
+    }
+    if (Array.isArray(manifest.books)) manifest.books.forEach(collect)
+    if (Array.isArray(manifest.collections)) {
+        for (const col of manifest.collections) {
+            if (!col || !Array.isArray(col.books)) continue
+            for (const b of col.books) collect(b)
+        }
+    }
+
+    const total = books.length
+    if (total === 0) return 0
+
+    // Progress mapping: start from DOWNLOAD_MAX up to 100
+    const DOWNLOAD_MAX = 90
+    for (let i = 0; i < total; i++) {
+        const book = books[i]
+        // join paragraphs into a single text blob
+        const text = book.paragraphs.join('\n\n')
+        const rel = `/books/${book.id}/tts.wav`
+        const outPath = path.join(tmpRoot, rel.replace(/^\//, ''))
+        try {
+            ensureDir(path.dirname(outPath))
+            // write a temporary text file and call tts with --text_file (safer for long/complex text)
+            const tempTextPath = outPath + '.txt'
+            try { fs.writeFileSync(tempTextPath, text, 'utf8') } catch (e) { console.warn('[updater] failed to write tts text file', tempTextPath, e && e.message) }
+            // spawn tts CLI. Use a timeout and make this best-effort.
+            const args = ['--text_file', tempTextPath, '--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', outPath]
+            await new Promise((resolve) => {
+                let settled = false
+                try {
+                    const cp = spawn('tts', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+                    // log stderr for debugging
+                    cp.stderr && cp.stderr.on('data', (d) => { console.warn('[updater][tts] ' + String(d)) })
+                    cp.stdout && cp.stdout.on('data', (d) => { /* ignore or log if needed */ })
+                    cp.on('error', (err) => {
+                        console.warn('[updater] TTS spawn error for book', book.id, err && err.message)
+                        if (!settled) { settled = true; try { if (fs.existsSync(tempTextPath)) fs.unlinkSync(tempTextPath) } catch (e) { }; resolve() }
+                    })
+                    cp.on('close', (code) => {
+                        if (code !== 0) console.warn('[updater] TTS exited with code', code, 'for book', book.id)
+                        if (!settled) { settled = true; try { if (fs.existsSync(tempTextPath)) fs.unlinkSync(tempTextPath) } catch (e) { }; resolve() }
+                    })
+                    // safety timeout (120s)
+                    setTimeout(() => {
+                        if (!settled) {
+                            try { cp.kill() } catch (e) { }
+                            console.warn('[updater] TTS timeout for book', book.id)
+                            settled = true
+                            try { if (fs.existsSync(tempTextPath)) fs.unlinkSync(tempTextPath) } catch (e) { }
+                            resolve()
+                        }
+                    }, 120000)
+                } catch (e) {
+                    console.warn('[updater] TTS error for book', book.id, e && e.message)
+                    try { if (fs.existsSync(tempTextPath)) fs.unlinkSync(tempTextPath) } catch (e) { }
+                    resolve()
+                }
+            })
+        } catch (e) {
+            console.warn('[updater] Failed to generate TTS for book', book.id, e && e.message)
+            // continue, do not abort update
+        }
+        // emit progress across the TTS stage
+        const pct = DOWNLOAD_MAX + ((i + 1) / total) * (100 - DOWNLOAD_MAX)
+        if (typeof emitProgress === 'function') emitProgress(Math.min(100, pct), `Generated TTS for book ${book.id}`)
+    }
+    return total
+}
+
 async function runUpdater(options) {
     // options: { distDir, remoteBaseUrl, onProgress }
     const distDir = options.distDir
@@ -155,8 +235,8 @@ async function runUpdater(options) {
 
     const localContentPath = path.join(distDir, 'content.json')
 
-    // Phase mapping: analyze (0-5%), create folders (5-15%), download (15-100%)
-    const PHASE = { ANALYZE_MAX: 5, CREATE_MAX: 15 }
+    // Phase mapping: analyze (0-5%), create folders (5-15%), download (15-90%), tts (90-100%)
+    const PHASE = { ANALYZE_MAX: 5, CREATE_MAX: 15, DOWNLOAD_MAX: 90 }
 
     // helper to emit progress and status
     function emitProgress(percent, message) {
@@ -280,10 +360,10 @@ async function runUpdater(options) {
         try {
             // increase per-file timeout for potentially large video files (120s)
             await downloadToFile(f.url, dest, 120000, (progress) => {
-                // progress: compute overall percent mapping
+                // progress: compute overall percent mapping (map downloads into CREATE_MAX..DOWNLOAD_MAX)
                 const fileFraction = totalFiles > 0 ? (idx + (progress.total ? (progress.received / progress.total) : 0)) / totalFiles : 0
-                const overall = PHASE.CREATE_MAX + fileFraction * (100 - PHASE.CREATE_MAX)
-                emitProgress(Math.min(100, overall), `Downloading ${relPath}`)
+                const overall = PHASE.CREATE_MAX + fileFraction * (PHASE.DOWNLOAD_MAX - PHASE.CREATE_MAX)
+                emitProgress(Math.min(PHASE.DOWNLOAD_MAX, overall), `Downloading ${relPath}`)
             })
             downloaded++
             // Verify file size is non-zero
@@ -294,14 +374,25 @@ async function runUpdater(options) {
                 try { fs.rmSync(dest, { force: true }) } catch (e) { }
                 throw new Error(`Downloaded file invalid for ${f.url}: ${statErr && statErr.message}`)
             }
-            const overallAfter = PHASE.CREATE_MAX + (downloaded / totalFiles) * (100 - PHASE.CREATE_MAX)
-            emitProgress(Math.min(100, overallAfter), `Downloaded ${relPath}`)
+            const overallAfter = PHASE.CREATE_MAX + (downloaded / totalFiles) * (PHASE.DOWNLOAD_MAX - PHASE.CREATE_MAX)
+            emitProgress(Math.min(PHASE.DOWNLOAD_MAX, overallAfter), `Downloaded ${relPath}`)
             console.log(`[updater] Downloaded ${relPath}`)
             // brief pause so you can follow progress
         } catch (e) {
             try { fs.rmSync(tmpRoot, { recursive: true, force: true }) } catch (e) { }
             throw new Error('Failed to download ' + f.url + ': ' + e.message)
         }
+    }
+
+    // Phase 4: generate TTS audio for books that have paragraphs
+    emitStatus('Generating TTS audio files...')
+    console.log('[updater] Phase 4: generating tts files')
+    try {
+        // best-effort: generate WAV files under tmpRoot/books/{id}/tts.wav
+        await generateTtsFiles(remote, tmpRoot, options, emitProgress)
+    } catch (e) {
+        console.warn('[updater] TTS generation failed:', e && e.message)
+        // don't abort update; TTS is optional
     }
 
     // move tmp files into place: replace distDir/books and distDir/content.json
