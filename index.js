@@ -364,6 +364,8 @@ async function createWindow() {
                     height: 200,
                     frame: false,
                     resizable: false,
+                    kiosk: true,
+                    autoHideMenuBar: true,
                     show: false,
                     webPreferences: {
                         preload: path.join(__dirname, 'preload-updater.js'),
