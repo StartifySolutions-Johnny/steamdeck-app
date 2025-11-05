@@ -214,7 +214,7 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
                 let cp2 = null
                 try {
                     // create args including the text
-                    const textArgs = ['--text', text, '--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p262', '--out_path', outPath]
+                    const textArgs = ['--text', text, '--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p317', '--out_path', outPath]
                     try {
                         // Log a short preview and length so we can debug spawn issues
                         const preview = String(text).replace(/\n/g, '\\n').slice(0, 200)
