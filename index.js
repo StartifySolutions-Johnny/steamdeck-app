@@ -340,7 +340,7 @@ async function createWindow() {
 
         // perform a lightweight check (no downloads)
         try {
-            const check = await updater.checkForUpdate({ distDir, remoteBaseUrl: 'https://nintendo-switch-content-ee8d316db220.herokuapp.com' })
+            const check = await updater.checkForUpdate({ distDir, remoteBaseUrl: 'https://gamepad-app.startifysolutions.com' })
             if (check && check.available) {
                 try { new Notification({ title: 'Content update available', body: `New content ${check.remoteVer}` }).show() } catch (e) { }
                 try { if (win && !win.isDestroyed()) win.webContents.send('update-available', check) } catch (e) { }
@@ -351,7 +351,7 @@ async function createWindow() {
 
         // Expose IPC handlers so renderer can ask for checks and trigger the full updater.
         ipcMain.handle('updater:check', async () => {
-            try { return await updater.checkForUpdate({ distDir, remoteBaseUrl: 'https://nintendo-switch-content-ee8d316db220.herokuapp.com' }) }
+            try { return await updater.checkForUpdate({ distDir, remoteBaseUrl: 'https://gamepad-app.startifysolutions.com' }) }
             catch (e) { return { error: String(e) } }
         })
 
@@ -387,7 +387,7 @@ async function createWindow() {
                 }
 
                 onStatus('Starting update...')
-                const res = await updater.runUpdater({ distDir, remoteBaseUrl: 'https://nintendo-switch-content-ee8d316db220.herokuapp.com', onProgress })
+                const res = await updater.runUpdater({ distDir, remoteBaseUrl: 'https://gamepad-app.startifysolutions.com', onProgress })
                 onStatus(res && res.updated ? 'Update applied' : 'No update')
 
                 // If an update was applied, reload the main window so it fetches the
