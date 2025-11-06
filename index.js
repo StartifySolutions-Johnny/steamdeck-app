@@ -692,27 +692,6 @@ ipcMain.handle('system:stop-and-quit', async (_, password) => {
     try {
         if (process.platform !== 'linux') return { ok: false, supported: false, error: 'Unsupported platform' }
 
-        // Require a password to proceed
-        if (!password) return { ok: false, error: 'Password required' }
-
-        // Validate sudo by running `sudo -S -p '' -v` and writing the password to stdin.
-        const validateSudo = () => new Promise((resolve) => {
-            try {
-                const v = spawn('sudo', ['-S', '-p', '', '-v'], { stdio: ['pipe', 'pipe', 'pipe'] })
-                let stderr = ''
-                v.stderr.on('data', (d) => { stderr += String(d || '') })
-                v.on('exit', (code) => { resolve({ code, stderr }) })
-                try { v.stdin.write(String(password || '') + '\n'); v.stdin.end() } catch (e) { }
-            } catch (e) {
-                resolve({ code: 1, stderr: String(e) })
-            }
-        })
-
-        const valid = await validateSudo()
-        if (!valid || valid.code !== 0) {
-            return { ok: false, error: 'Incorrect sudo password', stderr: valid && valid.stderr }
-        }
-
         // Stop the user service (no sudo expected for --user)
         try {
             await execPromise('systemctl --user stop gamepad-overlay.service')
