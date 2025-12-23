@@ -379,7 +379,7 @@ async function runUpdater(options) {
     console.log('[updater] Phase 4: generating tts files')
     try {
         // best-effort: generate WAV files under tmpRoot/books/{id}/tts.wav
-        await generateTtsFiles(remote, tmpRoot, options, emitProgress)
+        await generateTtsFiles(remote, tmpRoot, options, emitProgress, remoteBaseUrl)
     } catch (e) {
         console.warn('[updater] TTS generation failed:', e && e.message)
         // don't abort update; TTS is optional
