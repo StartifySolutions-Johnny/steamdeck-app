@@ -151,20 +151,17 @@ function parseCssForAssets(cssText, baseUrl) {
 
 // Generate TTS WAV files for books that contain a `paragraphs` array.
 // Writes files into the temporary update folder (tmpRoot) under /books/{id}/tts.wav
-// This is best-effort: failures are logged but won't abort the overall update.
-async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
+// If a remote TTS URL exists, download it instead of generating locally.
+async function generateTtsFiles(manifest, tmpRoot, options, emitProgress, remoteBaseUrl) {
     if (!manifest) return 0
-    // collect books that include paragraph text either in a `paragraphs` array
-    // or as `content` items of type 'paragraph'
+
     const books = []
     const collect = (b) => {
         if (!b) return
-        // prefer explicit paragraphs array
         if (Array.isArray(b.paragraphs) && b.paragraphs.length > 0) {
             books.push(b)
             return
         }
-        // otherwise inspect book.content for paragraph items
         if (Array.isArray(b.content)) {
             for (const it of b.content) {
                 if (it && it.type === 'paragraph' && typeof it.text === 'string' && it.text.trim() !== '') {
@@ -174,6 +171,7 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
             }
         }
     }
+
     if (Array.isArray(manifest.books)) manifest.books.forEach(collect)
     if (Array.isArray(manifest.collections)) {
         for (const col of manifest.collections) {
@@ -185,89 +183,37 @@ async function generateTtsFiles(manifest, tmpRoot, options, emitProgress) {
     const total = books.length
     if (total === 0) return 0
 
-    // Progress mapping: start from DOWNLOAD_MAX up to 100
     const DOWNLOAD_MAX = 90
     for (let i = 0; i < total; i++) {
         const book = books[i]
-        // collect paragraph texts: prefer book.paragraphs, else extract from content items
-        let paragraphs = []
-        if (Array.isArray(book.paragraphs) && book.paragraphs.length > 0) {
-            paragraphs = book.paragraphs.map(p => (typeof p === 'string' ? p : String(p)))
-        } else if (Array.isArray(book.content)) {
-            for (const it of book.content) {
-                if (it && it.type === 'paragraph' && typeof it.text === 'string') paragraphs.push(it.text)
-            }
-        }
-        if (!paragraphs || paragraphs.length === 0) {
-            // nothing to speak for this book
-            continue
-        }
-        // join paragraphs into a single text blob for the TTS input
-        const text = paragraphs.join('\n\n')
         const rel = `/books/${book.id}/tts.wav`
         const outPath = path.join(tmpRoot, rel.replace(/^\//, ''))
+        ensureDir(path.dirname(outPath))
+
         try {
-            ensureDir(path.dirname(outPath))
-            await new Promise((resolve) => {
-                let settled = false
-                let to = null
-                let cp2 = null
-                try {
-                    // create args including the text
-                    const textArgs = ['--text', text, '--model_name', 'tts_models/en/vctk/vits', '--speaker_idx', 'p317', '--out_path', outPath]
-                    try {
-                        // Log a short preview and length so we can debug spawn issues
-                        const preview = String(text).replace(/\n/g, '\\n').slice(0, 200)
-                        console.log(`[updater] spawning tts for book ${book.id} (text_len=${String(text).length}) preview="${preview}"`)
-                        // capture both stdout and stderr so we can see what the CLI prints
-                        cp2 = spawn('tts', textArgs, { stdio: ['ignore', 'pipe', 'pipe'] })
-                        cp2.stdout && cp2.stdout.on('data', (d) => { console.log(`[updater][tts stdout ${book.id}] ${String(d)}`) })
-                        cp2.stderr && cp2.stderr.on('data', (d) => { console.warn(`[updater][tts stderr ${book.id}] ${String(d)}`) })
-                        cp2.on('error', (err) => {
-                            console.warn('[updater] TTS spawn error for book', book.id, err && err.message)
-                            if (!settled) { settled = true; if (to) clearTimeout(to); resolve() }
-                        })
-                        cp2.on('close', (code) => {
-                            if (code !== 0) console.warn('[updater] TTS exited with code', code, 'for book', book.id)
-                            try {
-                                if (fs.existsSync(outPath)) {
-                                    const st = fs.statSync(outPath)
-                                    if (!st || st.size === 0) console.warn('[updater] TTS produced empty file for book', book.id, outPath)
-                                } else {
-                                    console.warn('[updater] TTS produced no output file for book', book.id, outPath)
-                                }
-                            } catch (e) { }
-                            if (!settled) { settled = true; if (to) clearTimeout(to); resolve() }
-                        })
-                    } catch (e) {
-                        console.warn('[updater] failed to spawn tts with --text for book', book.id, e && e.message)
-                        if (!settled) { settled = true; resolve() }
+            // Determine remote TTS URL (you can adapt logic, e.g., remoteBaseUrl + /books/{id}/tts.wav)
+            const ttsUrl = (remoteBaseUrl ? new URL(`/books/${book.id}/tts.wav`, remoteBaseUrl).toString() : null)
+            if (ttsUrl) {
+                console.log(`[updater] downloading TTS for book ${book.id} from remote`)
+                await downloadToFile(ttsUrl, outPath, 120000, (progress) => {
+                    if (emitProgress) {
+                        const pct = DOWNLOAD_MAX + ((i + progress.received / (progress.total || 1)) / total) * (100 - DOWNLOAD_MAX)
+                        emitProgress(Math.min(100, pct), `Downloading TTS for book ${book.id}`)
                     }
-
-                    // safety timeout (120s)
-                    to = setTimeout(() => {
-                        if (!settled) {
-                            try { if (cp2 && typeof cp2.kill === 'function') cp2.kill() } catch (e) { }
-                            console.warn('[updater] TTS timeout for book', book.id)
-                            settled = true
-                            try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
-                            resolve()
-                        }
-                    }, 120000)
-
-                } catch (e) {
-                    console.warn('[updater] TTS error for book', book.id, e && e.message)
-                    try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
-                    if (!settled) { settled = true; if (to) clearTimeout(to); resolve() }
-                }
-            })
+                })
+            } else {
+                console.warn(`[updater] no remote TTS URL for book ${book.id}, skipping`)
+            }
         } catch (e) {
-            console.warn('[updater] Failed to generate TTS for book', book.id, e && e.message)
-            // continue, do not abort update
+            console.warn('[updater] failed to download TTS for book', book.id, e && e.message)
+            try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath) } catch (e) { }
         }
-        // emit progress across the TTS stage
-        const pct = DOWNLOAD_MAX + ((i + 1) / total) * (100 - DOWNLOAD_MAX)
-        if (typeof emitProgress === 'function') emitProgress(Math.min(100, pct), `Generated TTS for book ${book.id}`)
+
+        // emit progress for this book
+        if (typeof emitProgress === 'function') {
+            const pct = DOWNLOAD_MAX + ((i + 1) / total) * (100 - DOWNLOAD_MAX)
+            emitProgress(Math.min(100, pct), `Processed TTS for book ${book.id}`)
+        }
     }
     return total
 }
