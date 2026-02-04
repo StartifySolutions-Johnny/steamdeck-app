@@ -1,5 +1,5 @@
 {
-  "version": "1.2.23",
+  "version": "1.2.24",
   "collections": [
     {
       "id": 0,
@@ -443,6 +443,22 @@
             {
               "type": "video",
               "src": "/books/19/video.mp4"
+            }
+          ]
+        },
+        {
+          "id": 20,
+          "title": "The Game Awards 2025",
+          "cover": "cover.png",
+          "template": 1,
+          "content": [
+            {
+              "type": "heading",
+              "text": "The Game Awards 2025"
+            },
+            {
+              "type": "video",
+              "src": "/books/20/video.mp4"
             }
           ]
         }
