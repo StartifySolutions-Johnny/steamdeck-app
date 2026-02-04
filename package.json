@@ -1,6 +1,6 @@
 {
   "name": "steamdeck-app",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -33,6 +33,7 @@
     },
     "files": [
       "dist/**/*",
+      "dist2/**/*",
       "index.js",
       "preload.js",
       "preload-updater.js",
@@ -42,6 +43,7 @@
     ],
     "asarUnpack": [
       "dist/**",
+      "dist2/**",
       "public/**"
     ],
     "win": {
