@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const http = require('http')
@@ -6,6 +6,9 @@ const { spawn, exec } = require('child_process')
 const os = require('os')
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
+
+app.commandLine.appendSwitch('disable-http-cache');
+
 
 log.transports.file.level = "info";
 autoUpdater.logger = log;
@@ -176,6 +179,23 @@ function fetchJson(url, timeout = 5000) {
     })
 }
 
+async function chooseMode() {
+    const result = await dialog.showMessageBox({
+        type: 'question',
+        buttons: [
+            'Interactive Educational Platform',
+            'Presentation Deck',
+        ],
+        defaultId: 0,
+        cancelId: 1,
+        title: 'Choose Mode',
+        message: 'How would you like to start?',
+        detail: 'You can switch modes later in settings.',
+    });
+
+    return result.response === 0 ? 'interactive' : 'presentation';
+}
+
 // Try to create a stable symlink to the most-recently downloaded AppImage.
 // This centralizes the logic so we can call it at startup.
 async function tryCreateAppImageSymlink() {
@@ -286,18 +306,23 @@ async function createWindow() {
     // place unpacked resources under process.resourcesPath (app.asar.unpacked)
     const resourcesPath = process.resourcesPath || __dirname
     const unpackedDistIndex = path.join(resourcesPath, 'app.asar.unpacked', 'dist', 'index.html')
+    const unpackedDistIndex2 = path.join(resourcesPath, 'app.asar.unpacked', 'dist2', 'index.html')
     const extraResourcesDistIndex = path.join(resourcesPath, 'app-dist', 'index.html')
+    const extraResourcesDistIndex2 = path.join(resourcesPath, 'app-dist2', 'index.html')
     // Prefer an embedded dist folder inside this Electron app first (dev)
     const embeddedDistIndex = path.join(__dirname, 'dist', 'index.html')
+    const embeddedDistIndex2 = path.join(__dirname, 'dist2', 'index.html')
     // Fallback to the sibling project build
     //const siblingDistIndex = path.join(__dirname, '..', 'nintendo-switch-web-ui', 'dist', 'index.html')
-    const localIndex = path.join(__dirname, 'index.html')
 
     // Choose the first path that exists, preferring unpacked/external resources when packaged
     const chosenDistIndex = fs.existsSync(unpackedDistIndex) ? unpackedDistIndex : (fs.existsSync(extraResourcesDistIndex) ? extraResourcesDistIndex : fs.existsSync(embeddedDistIndex) ? embeddedDistIndex : null)
+    const chosenDistIndex2 = fs.existsSync(unpackedDistIndex2) ? unpackedDistIndex2 : (fs.existsSync(extraResourcesDistIndex2) ? extraResourcesDistIndex2 : fs.existsSync(embeddedDistIndex2) ? embeddedDistIndex2 : null)
+
     // resolvedDistDir will hold the final, writable dist directory the app should serve from.
     // It's computed below (may be copied to userData on AppImage) and then reused by the server.
     let resolvedDistDir = null
+    let resolvedDistDir2 = null
 
     // Updater: do a lightweight check at startup (no downloading). If an update
     // is available, notify the user (notification + renderer event). Actual
@@ -308,6 +333,8 @@ async function createWindow() {
         // Determine the runtime dist directory (where the app currently serves from).
         const runtimeSourceDir = path.dirname(chosenDistIndex || embeddedDistIndex)
         let distDir = runtimeSourceDir
+        const runtimeSourceDir2 = path.dirname(chosenDistIndex2 || embeddedDistIndex2)
+        let distDir2 = runtimeSourceDir2
 
         // Detect AppImage / mounted runtime on Linux and prefer a writable copy in userData
         const runningOnLinux = process.platform === 'linux'
@@ -336,6 +363,31 @@ async function createWindow() {
                 } else if (fs.existsSync(userDist)) distDir = userDist
             } catch (e) { console.warn('[updater] failed to prepare writable dist copy:', e && e.message); distDir = runtimeSourceDir }
             resolvedDistDir = distDir
+            try {
+                const userDist = path.join(app.getPath('userData'), 'dist2')
+                if (runtimeSourceDir2 && fs.existsSync(runtimeSourceDir2) && !fs.existsSync(userDist)) {
+                    fs.mkdirSync(userDist, { recursive: true })
+                    if (typeof fs.cpSync === 'function') fs.cpSync(runtimeSourceDir2, userDist, { recursive: true })
+                    else {
+                        const copyRecursiveSync = (src, dest) => {
+                            const entries = fs.readdirSync(src, { withFileTypes: true })
+                            for (const entry of entries) {
+                                const srcPath = path.join(src, entry.name)
+                                const destPath = path.join(dest, entry.name)
+                                if (entry.isDirectory()) {
+                                    if (!fs.existsSync(destPath)) fs.mkdirSync(destPath)
+                                    copyRecursiveSync(srcPath, destPath)
+                                } else fs.copyFileSync(srcPath, destPath)
+                            }
+                        }
+                        copyRecursiveSync(runtimeSourceDir, userDist)
+                    }
+                    distDir2 = userDist
+                } else if (fs.existsSync(userDist)) distDir2 = userDist
+            } catch (e) { console.warn('[updater] failed to prepare writable dist copy:', e && e.message); distDir2 = runtimeSourceDir2 }
+            resolvedDistDir2 = distDir2
+            console.log(resolvedDistDir2);
+
         }
 
         // perform a lightweight check (no downloads)
@@ -420,7 +472,7 @@ async function createWindow() {
         console.warn('Updater module not available:', e && e.message)
     }
 
-    if (chosenDistIndex) {
+    if (chosenDistIndex && chosenDistIndex2) {
         // Serve the dist directory over a small local HTTP server so absolute paths
         // like /assets/... resolve correctly (the build uses leading slashes).
         const http = require('http')
@@ -433,9 +485,18 @@ async function createWindow() {
         } catch (e) {
             // ignore
         }
+        // If a userData copy exists from a previous run, prefer it so updates persist
+        try {
+            const userDistCandidate2 = path.join(app.getPath('userData'), 'dist2')
+            if (!resolvedDistDir2 && fs.existsSync(userDistCandidate2)) resolvedDistDir2 = userDistCandidate2
+        } catch (e) {
+            // ignore
+        }
 
         // Use the resolved writable dist if available; otherwise fall back to chosenDistIndex
         const distDir = resolvedDistDir || path.dirname(chosenDistIndex || embeddedDistIndex)
+        const distDir2 = resolvedDistDir2 || path.dirname(chosenDistIndex2 || embeddedDistIndex2)
+
 
         const server = http.createServer((req, res) => {
             try {
@@ -445,6 +506,7 @@ async function createWindow() {
 
                 // prevent directory traversal
                 const safePath = path.normalize(path.join(distDir, pathname))
+
                 if (!safePath.startsWith(distDir)) {
                     res.statusCode = 403
                     res.end('Forbidden')
@@ -515,14 +577,95 @@ async function createWindow() {
                 res.end('Server error')
             }
         })
+        const server2 = http.createServer((req, res) => {
+            try {
+                const parsed = url.parse(req.url)
+                let pathname = decodeURIComponent(parsed.pathname)
+                if (pathname === '/') pathname = '/index.html'
 
-        server.listen(0, '127.0.0.1', () => {
-            const port = server.address().port
-            win.loadURL(`http://127.0.0.1:${port}/`)
+                // prevent directory traversal
+                const safePath2 = path.normalize(path.join(distDir2, pathname))
+
+                if (!safePath2.startsWith(distDir2)) {
+                    res.statusCode = 403
+                    res.end('Forbidden')
+                    return
+                }
+
+                if (!fs.existsSync(safePath2) || fs.statSync(safePath2).isDirectory()) {
+                    res.statusCode = 404
+                    res.end('Not found')
+                    return
+                }
+
+                const ext = path.extname(safePath2).toLowerCase()
+                const mime = {
+                    '.html': 'text/html; charset=utf-8',
+                    '.js': 'application/javascript; charset=utf-8',
+                    '.css': 'text/css; charset=utf-8',
+                    '.png': 'image/png',
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.mp4': 'video/mp4',
+                    '.webm': 'video/webm',
+                    '.ogg': 'video/ogg',
+                    '.mp3': 'audio/mpeg',
+                    '.svg': 'image/svg+xml',
+                    '.woff': 'font/woff',
+                    '.woff2': 'font/woff2',
+                    '.ttf': 'font/ttf',
+                    '.json': 'application/json',
+                    '.map': 'application/octet-stream'
+                }[ext] || 'application/octet-stream'
+
+                res.setHeader('Content-Type', mime)
+                // Prevent caching of JSON manifests so updated content.json is picked up immediately
+                if (ext === '.json') {
+                    res.setHeader('Cache-Control', 'no-store, must-revalidate')
+                    res.setHeader('Pragma', 'no-cache')
+                    res.setHeader('Expires', '0')
+                }
+                // Add ETag/Last-Modified so clients can conditional GET and detect updates
+                try {
+                    const stat = fs.statSync(safePath2)
+                    const etag = `W/"${stat.size}-${stat.mtimeMs}"`
+                    res.setHeader('ETag', etag)
+                    res.setHeader('Last-Modified', stat.mtime.toUTCString())
+                    const ifNoneMatch = req.headers['if-none-match']
+                    const ifModifiedSince = req.headers['if-modified-since']
+                    if (ifNoneMatch === etag || (ifModifiedSince && new Date(ifModifiedSince).getTime() >= stat.mtimeMs)) {
+                        res.statusCode = 304
+                        res.end()
+                        return
+                    }
+                } catch (e) {
+                    // ignore stat errors and continue to serve the file
+                }
+                const stream = fs.createReadStream(safePath2)
+                stream.pipe(res)
+                stream.on('error', () => {
+                    res.statusCode = 500
+                    res.end('Server error')
+                })
+            } catch (err) {
+                res.statusCode = 500
+                res.end('Server error')
+            }
         })
+
+        await server.listen(3000, '127.0.0.1')
+        await server2.listen(3001, '127.0.0.1')
+        const mode = await chooseMode();
+        if (mode === "interactive") {
+            win.loadURL(`http://127.0.0.1:${3000}/`)
+        } else {
+            win.loadURL(`http://127.0.0.1:${3001}/`)
+        }
+
 
         // Close server when the window is closed or app quits
         const cleanup = () => {
+            try { server2.close() } catch (e) { }
             try { server.close() } catch (e) { }
         }
         win.on('closed', cleanup)
@@ -531,7 +674,8 @@ async function createWindow() {
     } else if (fs.existsSync(localIndex)) {
         // fallback to the local index.html in this folder
         win.loadFile(localIndex)
-    } else {
+    }
+    else {
         // If neither exists, load a simple error page
         const html = `<!doctype html><html><body><h2>App not found</h2><p>Create a build in ../nintendo-switch-web-ui/dist or add an index.html to this folder.</p></body></html>`
         win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
