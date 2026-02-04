@@ -33,6 +33,7 @@
     },
     "files": [
       "dist/**/*",
+      "dist2/**/*",
       "index.js",
       "preload.js",
       "preload-updater.js",
@@ -42,6 +43,7 @@
     ],
     "asarUnpack": [
       "dist/**",
+      "dist2/**",
       "public/**"
     ],
     "win": {
