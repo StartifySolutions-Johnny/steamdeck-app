@@ -314,7 +314,7 @@ async function createWindow() {
     const embeddedDistIndex2 = path.join(__dirname, 'dist2', 'index.html')
     // Fallback to the sibling project build
     //const siblingDistIndex = path.join(__dirname, '..', 'nintendo-switch-web-ui', 'dist', 'index.html')
-
+    const localIndex = path.join(__dirname, 'index.html')
     // Choose the first path that exists, preferring unpacked/external resources when packaged
     const chosenDistIndex = fs.existsSync(unpackedDistIndex) ? unpackedDistIndex : (fs.existsSync(extraResourcesDistIndex) ? extraResourcesDistIndex : fs.existsSync(embeddedDistIndex) ? embeddedDistIndex : null)
     const chosenDistIndex2 = fs.existsSync(unpackedDistIndex2) ? unpackedDistIndex2 : (fs.existsSync(extraResourcesDistIndex2) ? extraResourcesDistIndex2 : fs.existsSync(embeddedDistIndex2) ? embeddedDistIndex2 : null)
